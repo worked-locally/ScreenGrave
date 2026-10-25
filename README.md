@@ -16,5 +16,5 @@ ScreenGrave is a clean, minimal, mobile-first TV show and movie tracker inspired
 
 1. **Clone the Repository**:
    ```sh
-   git clone https://github.com/yourusername/screengrave.git
+   git clone https://github.com/worked-locally/screengrave.git
    cd screengrave

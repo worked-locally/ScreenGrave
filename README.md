@@ -1,75 +1,20 @@
-# React + TypeScript + Vite
+# ScreenGrave
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ScreenGrave is a clean, minimal, mobile-first TV show and movie tracker inspired by the Hobi app. It is built as a Progressive Web App (PWA) using Vite, React, TypeScript, and Tailwind CSS. ScreenGrave fetches metadata, posters, trailers, and episode info from the TMDB API and syncs data with the Trakt API.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Tabs**: Bottom tab bar with Watchlist (default), Upcoming, Discover, and Watched.
+- **Discover**: TMDB multi-search and trending grid with Google-style suggestions dropdown.
+- **Detail Sheet**: Slide-up bottom sheet with backdrop and gradient, poster, overview, and trailer button.
+- **Episode Tracker**: Season pills, per-episode checkmarks, and "Mark season watched".
+- **Persistence**: LocalStorage only with migration from old "watching" entries to "watchlist".
+- **Animations**: Tap ripple, sparkle, sheet slide-up, and tab fade.
+- **PWA Basics**: Manifest, display: standalone, and iOS meta tags.
 
-## React Compiler
+## Installation and Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+1. **Clone the Repository**:
+   ```sh
+   git clone https://github.com/yourusername/screengrave.git
+   cd screengrave

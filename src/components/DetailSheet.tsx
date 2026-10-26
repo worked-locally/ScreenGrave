@@ -1,7 +1,8 @@
-import { img, type Title } from '../lib/tmdb'
-import type { ListName } from '../lib/library'
-import EpisodeTracker from './EpisodeTracker'
+import { useEffect, useRef, useState } from 'react'
 import type { useEpisodes } from '../lib/episodes'
+import type { ListName } from '../lib/library'
+import { img, type Title } from '../lib/tmdb'
+import EpisodeTracker from './EpisodeTracker'
 import TrailerButton from './TrailerButton'
 
 interface Props {
@@ -20,19 +21,52 @@ const LISTS: { id: ListName; label: string }[] = [
 
 export default function DetailSheet({ title, current, onClose, onSet, onRemove, ep }: Props) {
   const backdrop = img(title.backdrop, 'w780')
+  const [notice, setNotice] = useState('')
+  const timer = useRef<number | undefined>(undefined)
+
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+    // lock page scrolling while the sheet is open
+  useEffect(() => {
+    const html = document.documentElement
+    const prevHtml = html.style.overflow
+    const prevBody = document.body.style.overflow
+    html.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = prevHtml
+      document.body.style.overflow = prevBody
+    }
+  }, [])
+
+  function flash(message: string) {
+    setNotice(message)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setNotice(''), 2200)
+  }
+
+  function toggle(list: ListName, label: string) {
+    if (current === list) {
+      onRemove()
+      flash(`Removed from ${label}`)
+    } else {
+      onSet(list)
+      setNotice('')
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center">
-      <div className="anim-fade absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
+      <div className="anim-fade touch-none absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
       <div
-        className="anim-sheet relative max-h-[88%] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-[#16131a]"
+        className="anim-sheet relative max-h-[88%] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl bg-[#16131a]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}
       >
-   {backdrop && (
-     <div className="relative h-40 overflow-hidden rounded-t-3xl">
-       <img src={backdrop} alt="" className="h-full w-full object-cover opacity-70" />
-       <div className="absolute inset-0 bg-gradient-to-t from-[#16131a] to-transparent" />
-     </div>
-   )}
+        {backdrop && (
+          <div className="relative h-40 overflow-hidden rounded-t-3xl">
+            <img src={backdrop} alt="" className="h-full w-full object-cover opacity-70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#16131a] to-transparent" />
+          </div>
+        )}
         <div className="px-5 pt-4">
           <div className="flex gap-4">
             {title.poster && (
@@ -56,39 +90,42 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
             <p className="mt-4 text-sm leading-relaxed text-[#cdc6bd]">{title.overview}</p>
           )}
 
-	   <TrailerButton title={title} />
+          <TrailerButton title={title} />
 
           <div className="mt-6 grid grid-cols-2 gap-2">
-            {LISTS.map((l) => (
-              <button
-                key={l.id}
-                onClick={() => onSet(l.id)}
-                className="rounded-xl py-3 text-sm font-medium transition-colors"
-                style={
-                  current === l.id
-                    ? { background: l.id === 'watched' ? 'var(--done)' : 'var(--accent)', color: '#1a1008' }
-                    : { background: '#1f1a24', color: '#cdc6bd' }
-                }
-              >
-                {l.label}
-              </button>
-            ))}
+            {LISTS.map((l) => {
+              const active = current === l.id
+              return (
+                <button
+                  key={l.id}
+                  onClick={() => toggle(l.id, l.label)}
+                  className="rounded-xl py-3 text-sm font-medium transition-all active:scale-95"
+                  style={
+                    active
+                      ? { background: l.id === 'watched' ? 'var(--done)' : 'var(--accent)', color: '#1a1008' }
+                      : { background: '#1f1a24', color: '#cdc6bd' }
+                  }
+                >
+                  {l.label}
+                  {active && <span className="ml-1.5 text-[11px] font-semibold opacity-75">(Added)</span>}
+                </button>
+              )
+            })}
           </div>
 
-          {current && (
-            <button onClick={onRemove} className="mt-3 w-full py-2 text-sm text-[#8b8392]">
-              Remove from my lists
-            </button>
+          <p key={notice} className="anim-fade mt-2 h-4 text-center text-xs text-[#8b8392]">
+            {notice}
+          </p>
+
+          {title.type === 'tv' && (
+            <EpisodeTracker
+              show={title}
+              ep={ep}
+              onActivity={() => {
+                if (!current) onSet('watchlist')
+              }}
+            />
           )}
-	    {title.type === 'tv' && (
-    <EpisodeTracker
-      show={title}
-      ep={ep}
-   		onActivity={() => {
-     		 if (!current) onSet('watchlist')
-   	}}
-    />
-  )}
         </div>
       </div>
     </div>

@@ -1,0 +1,23 @@
+Next focus:
+
+– bug fixes:
+	- When poster detail page is opened, background scrolled back to the top
+	- When detail page is open again, first season was selected as default instead of current on going season that user have not watched
+	- Carousel need smooth scrolling and repeat endless scrolling
+	- Limit Discover page to 6 full rows
+	- Add padding top and bottom
+	- Tap/Click effect faster
+	- On Watchlist Screen, separate Movies and TV shows. Maybe two separate evenly divided Box that can be scrolled individually through it if movies or shows are filled up on each section. Add film related fun text divider between the sections. 
+	- Add film related fun text divider between the sections for other pages. Upcoming page can be left alone. Discover page can only have one divider between Trending this week and Browse. Watched page can be left alone as well. 
+	- Change bottom menu bar to use icons as primary (bigger than text) and text as secondary (Smaller text at bottom of the icons). Center Icon and Texts.
+
+- Features to add
+	- Temporary User icon top right along with title bar. (This will be use for user syncing with Trakt account or gmail account)
+		- Usericon (First time use)
+			- Login
+			- Register
+			- About
+		- Usericon (Logged in)
+			- Sync Now
+			- Settings
+			- About

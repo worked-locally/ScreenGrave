@@ -1,6 +1,8 @@
+import Poster from '../components/Poster'
 import type { useEpisodes } from '../lib/episodes'
 import { keyOf, type Library } from '../lib/library'
-import { img, type Info, type Title } from '../lib/tmdb'
+import type { Info, Title } from '../lib/tmdb'
+import ScreenTitle from '../components/ScreenTitle'
 
 interface Props {
   library: Library
@@ -23,32 +25,19 @@ export default function Watchlist({ library, info, ep, onSelect }: Props) {
 
   return (
     <div>
-      <h2 className="mb-5 text-2xl font-semibold tracking-tight">
-        Watchlist <span className="text-base font-normal text-[#8b8392]">{items.length}</span>
-      </h2>
-
+      <ScreenTitle title="Watchlist" count={items.length} />
+      
       {items.length === 0 ? (
         <p className="mt-16 text-center text-sm text-[#8b8392]">Nothing here yet. Find something in Discover.</p>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 items-start gap-3">
           {items.map(({ t, aired, seen, behind }) => (
             <button
               key={keyOf(t)}
               onClick={() => onSelect(t)}
               className="text-left transition-transform active:scale-95"
             >
-              {t.poster ? (
-                <img
-                  src={img(t.poster) ?? ''}
-                  alt={t.title}
-                  loading="lazy"
-                  className="aspect-[2/3] w-full rounded-xl bg-[#1f1a24] object-cover"
-                />
-              ) : (
-                <div className="flex aspect-[2/3] w-full items-center justify-center rounded-xl bg-[#1f1a24] p-2 text-center text-xs text-[#8b8392]">
-                  {t.title}
-                </div>
-              )}
+              <Poster title={t} />
               {behind && (
                 <div className="mt-2">
                   <div className="h-1 overflow-hidden rounded-full bg-white/10">
@@ -57,7 +46,7 @@ export default function Watchlist({ library, info, ep, onSelect }: Props) {
                       style={{ width: `${(seen / aired) * 100}%`, background: 'var(--accent)' }}
                     />
                   </div>
-                  <p className="mt-1 text-[11px] text-[#8b8392]">
+                  <p className="mt-1 text-[11px] tabular-nums text-[#8b8392]">
                     {seen} / {aired} eps
                   </p>
                 </div>

@@ -23,7 +23,7 @@ export default function TabBar({ active, onChange }: Props) {
           <button
             key={t.id}
             onClick={() => onChange(t.id)}
-            className="flex-1 py-3.5 text-xs font-medium tracking-wide transition-colors"
+            className="flex-1 py-5 text-[15px] font-semibold tracking-wide transition-colors"
             style={{ color: active === t.id ? 'var(--accent)' : '#8b8392' }}
           >
             {t.label}

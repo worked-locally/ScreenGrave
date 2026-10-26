@@ -96,6 +96,7 @@ export async function seasonEpisodes(id: number, season: number): Promise<Episod
     airDate: e.air_date ?? '',
   }))
 }
+
 export interface Info {
   aired: number // episodes aired so far (shows only)
   next: { date: string; label: string; name: string } | null
@@ -152,4 +153,90 @@ export async function trailerKey(type: MediaType, id: number): Promise<string | 
     vids.find((v) => v.type === 'Trailer') ??
     vids.find((v) => v.type === 'Teaser')
   return pick?.key ?? null
+}
+
+// ---------- Discover: genres and streaming services ----------
+
+export interface Genre {
+  id: number
+  name: string
+}
+
+export interface Provider {
+  id: number
+  name: string
+  logo: string | null
+}
+
+export interface Filter {
+  genre: number | null
+  provider: number | null
+}
+
+const REGION = 'US'
+
+// the services shown first, in this order (matched by name against TMDB's live list)
+const POPULAR_SERVICES: RegExp[] = [
+  /^netflix$/i,
+  /^amazon prime video$/i,
+  /^apple tv(\+| plus)$/i,
+  /^disney(\+| plus)$/i,
+  /^(hbo )?max$/i,
+  /^hulu$/i,
+  /^paramount(\+| plus)$/i,
+  /^peacock( premium)?$/i,
+  /^crunchyroll$/i,
+  /^starz$/i,
+  /^amc\+?$/i,
+  /^tubi( tv)?$/i,
+  /^pluto tv$/i,
+  /^shudder$/i,
+]
+
+export async function genres(type: MediaType): Promise<Genre[]> {
+  const d = await get(`/genre/${type}/list`)
+  return d.genres as Genre[]
+}
+
+export async function providers(type: MediaType): Promise<Provider[]> {
+  const d = await get(`/watch/providers/${type}`, { watch_region: REGION })
+  const list = (d.results ?? []) as {
+    provider_id: number
+    provider_name: string
+    logo_path: string | null
+    display_priority: number
+    display_priorities?: Record<string, number>
+  }[]
+  const rank = (p: (typeof list)[number]) => p.display_priorities?.[REGION] ?? p.display_priority
+  const sorted = [...list].sort((a, b) => rank(a) - rank(b))
+  const toProvider = (p: (typeof list)[number]): Provider => ({
+    id: p.provider_id,
+    name: p.provider_name,
+    logo: p.logo_path,
+  })
+
+  const picked: Provider[] = []
+  for (const re of POPULAR_SERVICES) {
+    const p = sorted.find((x) => re.test(x.provider_name.trim()))
+    if (p && !picked.some((q) => q.id === p.provider_id)) picked.push(toProvider(p))
+  }
+  return picked.length >= 4 ? picked : sorted.slice(0, 12).map(toProvider)
+}
+
+export async function discover(type: MediaType, filter: Filter, page = 1): Promise<Title[]> {
+  const params: Record<string, string> = {
+    sort_by: 'popularity.desc',
+    include_adult: 'false',
+    page: String(page),
+  }
+  if (filter.genre) params.with_genres = String(filter.genre)
+  if (filter.provider) {
+    params.with_watch_providers = String(filter.provider)
+    params.watch_region = REGION
+    params.with_watch_monetization_types = 'flatrate'
+  }
+  const d = await get(`/discover/${type}`, params)
+  return ((d.results ?? []) as RawResult[])
+    .map((r) => normalize({ ...r, media_type: type }))
+    .filter((t): t is Title => t !== null)
 }

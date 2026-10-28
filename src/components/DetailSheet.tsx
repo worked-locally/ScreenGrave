@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { useEpisodes } from '../lib/episodes'
 import type { ListName } from '../lib/library'
-import { img, type Title } from '../lib/tmdb'
+import { img, titleGenres, type Title } from '../lib/tmdb'
 import EpisodeTracker from './EpisodeTracker'
 import TrailerButton from './TrailerButton'
 
@@ -22,21 +22,38 @@ const LISTS: { id: ListName; label: string }[] = [
 export default function DetailSheet({ title, current, onClose, onSet, onRemove, ep }: Props) {
   const backdrop = img(title.backdrop, 'w780')
   const [notice, setNotice] = useState('')
+  const [genreNames, setGenreNames] = useState<string[]>([])
   const timer = useRef<number | undefined>(undefined)
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
-    // lock page scrolling while the sheet is open
+
+  // lock the page behind the sheet without losing its scroll position
   useEffect(() => {
-    const html = document.documentElement
-    const prevHtml = html.style.overflow
-    const prevBody = document.body.style.overflow
-    html.style.overflow = 'hidden'
-    document.body.style.overflow = 'hidden'
+    const y = window.scrollY
+    const body = document.body
+    const prev = { position: body.style.position, top: body.style.top, width: body.style.width }
+    body.style.position = 'fixed'
+    body.style.top = `-${y}px`
+    body.style.width = '100%'
     return () => {
-      html.style.overflow = prevHtml
-      document.body.style.overflow = prevBody
+      body.style.position = prev.position
+      body.style.top = prev.top
+      body.style.width = prev.width
+      window.scrollTo(0, y)
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    titleGenres(title.type, title.id)
+      .then((g) => {
+        if (!cancelled) setGenreNames(g)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [title.type, title.id])
 
   function flash(message: string) {
     setNotice(message)
@@ -61,6 +78,18 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
         className="anim-sheet relative max-h-[88%] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl bg-[#16131a]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}
       >
+        <div className="sticky top-0 z-10 h-0">
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-[#efe9df] backdrop-blur-sm transition-transform active:scale-90"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-4 w-4">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        
         {backdrop && (
           <div className="relative h-40 overflow-hidden rounded-t-3xl">
             <img src={backdrop} alt="" className="h-full w-full object-cover opacity-70" />
@@ -81,7 +110,6 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
               <p className="mt-1 text-sm text-[#8b8392]">
                 {title.type === 'tv' ? 'Series' : 'Movie'}
                 {title.year && ` · ${title.year}`}
-                {title.rating > 0 && ` · ★ ${title.rating}`}
               </p>
             </div>
           </div>
@@ -90,7 +118,31 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
             <p className="mt-4 text-sm leading-relaxed text-[#cdc6bd]">{title.overview}</p>
           )}
 
-          <TrailerButton title={title} />
+          {genreNames.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {genreNames.map((g) => (
+                <span key={g} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-[#cdc6bd]">
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-5 flex items-center gap-3">
+            <TrailerButton title={title} />
+            {title.rating > 0 && (
+              <span
+                className="ml-auto flex items-center gap-1.5 rounded-full bg-white/5 px-3.5 py-2 text-sm font-semibold tabular-nums"
+                title="Audience rating (TMDB)"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="var(--accent)">
+                  <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />
+                </svg>
+                {title.rating.toFixed(1)}
+                <span className="text-xs font-normal text-[#8b8392]">/10</span>
+              </span>
+            )}
+          </div>
 
           <div className="mt-6 grid grid-cols-2 gap-2">
             {LISTS.map((l) => {

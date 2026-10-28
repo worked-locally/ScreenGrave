@@ -3,6 +3,7 @@ import Poster from '../components/Poster'
 import { keyOf, type Library } from '../lib/library'
 import type { Title } from '../lib/tmdb'
 import ScreenTitle from '../components/ScreenTitle'
+import ScrollRow from '../components/ScrollRow'
 
 type Sort = 'year-desc' | 'year-asc' | 'title' | 'rating' | 'recent'
 
@@ -80,7 +81,7 @@ export default function Watched({ library, onSelect }: Props) {
         )}
       </div>
 
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+      <ScrollRow className="mb-4 gap-2 pb-1">
         {SORTS.map((s) => (
           <button
             key={s.id}
@@ -95,7 +96,7 @@ export default function Watched({ library, onSelect }: Props) {
             {s.label}
           </button>
         ))}
-      </div>
+      </ScrollRow>
 
       {all.length === 0 && (
         <p className="mt-16 text-center text-sm text-[#8b8392]">

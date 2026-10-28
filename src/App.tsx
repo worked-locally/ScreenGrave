@@ -11,6 +11,7 @@ import Discover from './screens/Discover'
 import Upcoming from './screens/Upcoming'
 import Watched from './screens/Watched'
 import Watchlist from './screens/Watchlist'
+import UserMenu from './components/UserMenu'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('watchlist')
@@ -44,11 +45,15 @@ export default function App() {
   return (
     <StatusContext.Provider value={{ library, info, count: ep.count }}>
       <div
-        className="mx-auto min-h-full max-w-xl px-4 pb-32"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}
+        className="relative mx-auto min-h-full max-w-xl px-4"
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top) + 2rem)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 6.5rem)',
+        }}
       >
         <TapEffects />
-
+        <UserMenu />
+        
         <div key={tab} className="anim-fade">
           {tab === 'watchlist' && <Watchlist library={library} info={info} ep={ep} onSelect={setSelected} />}
           {tab === 'upcoming' && <Upcoming library={library} info={info} onSelect={setSelected} />}

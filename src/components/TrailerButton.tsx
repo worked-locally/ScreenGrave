@@ -23,7 +23,7 @@ export default function TrailerButton({ title }: { title: Title }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="mt-5 flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
+        className="flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" style={{ color: 'var(--accent)' }}>
           <path d="M8 5v14l11-7z" />
@@ -34,7 +34,7 @@ export default function TrailerButton({ title }: { title: Title }) {
       {open &&
         createPortal(
           <div
-            className="anim-fade fixed inset-0 z-30 flex items-center justify-center bg-black/85 p-4"
+            className="anim-fade fixed inset-0 z-30 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
             onClick={() => setOpen(false)}
           >
             <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>

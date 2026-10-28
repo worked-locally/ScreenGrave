@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react'
 import type { useEpisodes } from '../lib/episodes'
 import { seasonEpisodes, showSeasons, type Episode, type Season, type Title } from '../lib/tmdb'
+import ScrollRow from './ScrollRow'
 
 interface Props {
   show: Title
   ep: ReturnType<typeof useEpisodes>
   onActivity: () => void
+}
+
+const todayStr = () => new Date().toLocaleDateString('en-CA')
+
+// the first started season you haven't finished, otherwise the latest started season
+function pickSeason(seasons: Season[], watchedIn: (season: number) => number): number {
+  const t = todayStr()
+  const started = seasons.filter((s) => !s.airDate || s.airDate <= t)
+  const open = started.find((s) => watchedIn(s.number) < s.episodeCount)
+  return (open ?? started[started.length - 1] ?? seasons[0]).number
 }
 
 export default function EpisodeTracker({ show, ep, onActivity }: Props) {
@@ -21,12 +32,13 @@ export default function EpisodeTracker({ show, ep, onActivity }: Props) {
       .then((s) => {
         if (cancelled) return
         setSeasons(s)
-        if (s.length) setSeason(s[0].number)
+        if (s.length) setSeason(pickSeason(s, (n) => ep.seasonCount(showKey, n)))
       })
       .catch((e) => !cancelled && setError(String(e)))
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show.id])
 
   useEffect(() => {
@@ -40,7 +52,7 @@ export default function EpisodeTracker({ show, ep, onActivity }: Props) {
     }
   }, [show.id, season, seasons.length])
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayStr()
   const aired = (e: Episode) => !e.airDate || e.airDate <= today
   const airedNumbers = episodes.filter(aired).map((e) => e.number)
   const watchedCount = airedNumbers.filter((n) => ep.isWatched(showKey, season, n)).length
@@ -51,25 +63,26 @@ export default function EpisodeTracker({ show, ep, onActivity }: Props) {
 
   return (
     <div className="mt-8">
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+      <ScrollRow className="mb-3 gap-2 pb-1" centerActive={`${season}-${seasons.length}`}>
         {seasons.map((s) => (
           <button
             key={s.number}
+            data-active={season === s.number}
             onClick={() => setSeason(s.number)}
             className="shrink-0 rounded-full px-4 py-1.5 text-sm font-medium"
             style={
               season === s.number
                 ? { background: 'var(--accent)', color: '#1a1008' }
-                : { background: '#1f1a24', color: '#a1a1aa' }
+                : { background: '#1f1a24', color: '#8b8392' }
             }
           >
             S{s.number}
           </button>
         ))}
-      </div>
+      </ScrollRow>
 
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-widest text-[#8b8392]">
+        <p className="text-xs uppercase tracking-widest tabular-nums text-[#8b8392]">
           {watchedCount} / {airedNumbers.length} watched
         </p>
         <button

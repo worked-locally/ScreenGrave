@@ -31,6 +31,12 @@ export function useEpisodes() {
     [watched],
   )
 
+  // number of watched episodes in one season
+  const seasonCount = useCallback(
+    (show: string, season: number) => (watched[show] ?? []).filter((key) => key.startsWith(`${season}-`)).length,
+    [watched],
+  )
+
   const toggle = useCallback((show: string, season: number, episode: number) => {
     setWatched((w) => {
       const cur = new Set(w[show] ?? [])
@@ -49,7 +55,7 @@ export function useEpisodes() {
     })
   }, [])
 
-  // merges many shows at once (used by the Trakt import next round)
+  // merges many shows at once (used by "Watched" and the Trakt import later)
   const addBulk = useCallback((data: Record<string, string[]>) => {
     setWatched((w) => {
       const next = { ...w }
@@ -60,5 +66,5 @@ export function useEpisodes() {
     })
   }, [])
 
-  return { isWatched, count, toggle, markSeason, addBulk }
+  return { isWatched, count, seasonCount, toggle, markSeason, addBulk }
 }

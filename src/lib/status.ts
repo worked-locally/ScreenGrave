@@ -33,3 +33,14 @@ export function useStatusOf() {
     return 'ready'
   }
 }
+
+// the date a not-yet-released title comes out, if TMDB knows it
+export function useReleaseDate() {
+  const { info } = useContext(StatusContext)
+
+  return (t: Title): string | null => {
+    const i = info[keyOf(t)]
+    const date = i?.release || i?.next?.date || ''
+    return date && date > todayStr() ? date : null
+  }
+}

@@ -73,6 +73,7 @@ export interface Season {
   number: number
   name: string
   episodeCount: number
+  airDate: string
 }
 
 export interface Episode {
@@ -83,9 +84,16 @@ export interface Episode {
 
 export async function showSeasons(id: number): Promise<Season[]> {
   const d = await get(`/tv/${id}`)
-  return (d.seasons as { season_number: number; name: string; episode_count: number }[])
+  return (
+    d.seasons as { season_number: number; name: string; episode_count: number; air_date: string | null }[]
+  )
     .filter((s) => s.season_number > 0 && s.episode_count > 0)
-    .map((s) => ({ number: s.season_number, name: s.name, episodeCount: s.episode_count }))
+    .map((s) => ({
+      number: s.season_number,
+      name: s.name,
+      episodeCount: s.episode_count,
+      airDate: s.air_date ?? '',
+    }))
 }
 
 export async function seasonEpisodes(id: number, season: number): Promise<Episode[]> {
@@ -99,6 +107,7 @@ export async function seasonEpisodes(id: number, season: number): Promise<Episod
 
 export interface Info {
   aired: number // episodes aired so far (shows only)
+  release: string // release date (movies) or premiere date (shows)
   next: { date: string; label: string; name: string } | null
   fetchedAt: number
 }
@@ -116,6 +125,7 @@ export async function fetchInfo(t: Title): Promise<Info> {
     const date = (d.release_date as string) || ''
     return {
       aired: 0,
+      release: date,
       next: date ? { date, label: 'Movie', name: 'Release' } : null,
       fetchedAt: Date.now(),
     }
@@ -136,6 +146,7 @@ export async function fetchInfo(t: Title): Promise<Info> {
 
   return {
     aired,
+    release: (d.first_air_date as string) || '',
     next: nx?.air_date
       ? { date: nx.air_date, label: `S${nx.season_number} · E${nx.episode_number}`, name: nx.name ?? '' }
       : null,
@@ -239,4 +250,16 @@ export async function discover(type: MediaType, filter: Filter, page = 1): Promi
   return ((d.results ?? []) as RawResult[])
     .map((r) => normalize({ ...r, media_type: type }))
     .filter((t): t is Title => t !== null)
+}
+
+const genreCache = new Map<string, string[]>()
+
+export async function titleGenres(type: MediaType, id: number): Promise<string[]> {
+  const key = `${type}-${id}`
+  const hit = genreCache.get(key)
+  if (hit) return hit
+  const d = await get(`/${type}/${id}`)
+  const names = ((d.genres ?? []) as { name: string }[]).map((g) => g.name)
+  genreCache.set(key, names)
+  return names
 }

@@ -34,7 +34,7 @@ body {
   margin: -7px 0 0 -7px;
   border-radius: 9999px;
   border: 2px solid var(--accent);
-  animation: tap-ripple 600ms ease-out forwards;
+  animation: tap-ripple 320ms ease-out forwards;
 }
 .tap-spark {
   position: absolute;
@@ -44,7 +44,7 @@ body {
   border-radius: 9999px;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
-  animation: tap-spark 550ms ease-out forwards;
+  animation: tap-spark 340ms ease-out forwards;
 }
 @keyframes tap-ripple {
   from { transform: scale(0.3); opacity: 0.9; }

@@ -91,18 +91,21 @@ npm install
 Create a file named `.env.local` in the project root:
 
 ```
-VITE_TMDB_TOKEN=your_tmdb_read_access_token
+TMDB_TOKEN=your_tmdb_read_access_token
 VITE_TRAKT_CLIENT_ID=your_trakt_client_id
 ```
 
 Then:
 
 ```powershell
-npm run dev       # start the dev server at http://localhost:5173
+npm run dev       # web app at http://localhost:5173, plus the server on 8787
 npm run build     # production build in /dist
+npm start         # serves the built app and API at http://localhost:8787
 ```
 
-> `.env.local` is gitignored, so never commit it. Variables starting with `VITE_` are bundled into the built site, so keep any deployment private until the TMDB token is moved behind a small server.
+Requires Node.js 24 or newer (uses Node's built-in SQLite). Your data lives in `data/screengrave.db`.
+
+> `.env.local` is gitignored, so never commit it. `TMDB_TOKEN` stays on the server and is never sent to the browser. Only variables starting with `VITE_` (currently just the Trakt client ID, which isn't secret) are included in the built site.
 
 ## Project layout
 
@@ -116,6 +119,24 @@ src/
 ---
 
 ## Changelog
+
+### 0.4.0 (Day 4)
+
+**Bug fixes**
+- Floating search button no longer hides behind the scroll arrows on desktop, and it now stays hidden while the search bar is on screen.
+- Upcoming shows the year for dates outside the current year, like "Fri, Jan 15, 2027".
+- Removed a leftover unused variable that would have broken production builds.
+
+**Improvements**
+- Floating search button on the Watched page.
+- Over 30 film-themed divider phrases.
+- Page titles now show their tab-bar icon.
+
+**Backend (new)**
+- Added a small server (Hono) that serves the app and passes TMDB requests through, so the TMDB token is no longer in the browser code.
+- Library and episode progress are now stored in SQLite (`data/screengrave.db`), shared across every browser and device that uses the server.
+- Data saved in a browser before this version is uploaded to the server automatically the first time that browser opens the app.
+- One `npm run dev` starts both the web app and the server, and `npm run build` then `npm start` runs it in production mode.
 
 ### 0.3.0 (Day 3)
 

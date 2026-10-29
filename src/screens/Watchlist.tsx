@@ -5,8 +5,8 @@ import ScreenTitle from '../components/ScreenTitle'
 import type { useEpisodes } from '../lib/episodes'
 import { keyOf, type Library } from '../lib/library'
 import type { Info, Title } from '../lib/tmdb'
+import { randomPhrase } from '../lib/phrases'
 
-const PHRASES = ['Intermission', 'Popcorn break', 'Plot twist ahead', 'Cue the credits', 'Lights, camera, snacks']
 const VISIBLE_ROWS = 3
 
 interface Item {
@@ -130,7 +130,7 @@ function Section({
 }
 
 export default function Watchlist({ library, info, ep, onSelect }: Props) {
-  const [phrase] = useState(() => PHRASES[Math.floor(Math.random() * PHRASES.length)])
+  const [phrase] = useState(randomPhrase)
 
   const items: Item[] = Object.values(library)
     .filter((e) => e.list === 'watchlist')
@@ -151,7 +151,7 @@ export default function Watchlist({ library, info, ep, onSelect }: Props) {
 
   return (
     <div>
-      <ScreenTitle title="Watchlist" count={items.length} />
+      <ScreenTitle title="Watchlist" count={items.length} icon="watchlist" />
 
       <Section id="movies" label="Movies" items={movies} empty="No movies yet. Add some from Discover." onSelect={onSelect} />
       <Divider text={phrase} />

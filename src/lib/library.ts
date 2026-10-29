@@ -1,49 +1,45 @@
 import { useCallback, useEffect, useState } from 'react'
+import { api, loadAll, reportSaveError } from './api'
 import type { Title } from './tmdb'
 
 export type ListName = 'watchlist' | 'watched'
-export type Library = Record<string, { title: Title; list: ListName; addedAt?: number }>
-
-const KEY = 'screengrave:library'
+export type Entry = { title: Title; list: ListName; addedAt?: number }
+export type Library = Record<string, Entry>
 
 export const keyOf = (t: Title) => `${t.type}-${t.id}`
 
-function load(): Library {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<
-      string,
-      { title: Title; list: string; addedAt?: number }
-    >
-    const out: Library = {}
-    for (const [k, v] of Object.entries(raw)) {
-      out[k] = {
-        title: v.title,
-        list: v.list === 'watched' ? 'watched' : 'watchlist',
-        addedAt: v.addedAt,
-      }
-    }
-    return out
-  } catch {
-    return {}
-  }
-}
-
 export function useLibrary() {
-  const [library, setLibrary] = useState<Library>(load)
+  const [library, setLibrary] = useState<Library>({})
+  const [ready, setReady] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(library))
-  }, [library])
+    let cancelled = false
+    loadAll()
+      .then((d) => {
+        if (cancelled) return
+        setLibrary(d.library)
+        setReady(true)
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const setList = useCallback((t: Title, list: ListName) => {
     setLibrary((l) => {
       const prev = l[keyOf(t)]
-      const addedAt = prev && prev.list === list ? prev.addedAt : Date.now()
-      return { ...l, [keyOf(t)]: { title: t, list, addedAt } }
+      const entry: Entry = { title: t, list, addedAt: prev && prev.list === list ? prev.addedAt : Date.now() }
+      api.putEntry(keyOf(t), entry).catch(reportSaveError)
+      return { ...l, [keyOf(t)]: entry }
     })
   }, [])
 
   const remove = useCallback((t: Title) => {
+    api.deleteEntry(keyOf(t)).catch(reportSaveError)
     setLibrary((l) => {
       const next = { ...l }
       delete next[keyOf(t)]
@@ -53,14 +49,16 @@ export function useLibrary() {
 
   // adds titles that aren't in the library yet (used by the Trakt import later)
   const addMany = useCallback((entries: { title: Title; list: ListName }[]) => {
+    const now = Date.now()
+    const batch: Library = {}
+    for (const e of entries) batch[keyOf(e.title)] = { ...e, addedAt: now }
+    api.importData(batch, {}).catch(reportSaveError)
     setLibrary((l) => {
       const next = { ...l }
-      for (const e of entries) {
-        if (!next[keyOf(e.title)]) next[keyOf(e.title)] = { ...e, addedAt: Date.now() }
-      }
+      for (const [k, e] of Object.entries(batch)) if (!next[k]) next[k] = e
       return next
     })
   }, [])
 
-  return { library, setList, remove, addMany }
+  return { library, ready, error, setList, remove, addMany }
 }

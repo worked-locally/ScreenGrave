@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Carousel3D from '../components/Carousel3D'
 import Divider from '../components/Divider'
+import FloatingSearch from '../components/FloatingSearch'
 import PosterGrid from '../components/PosterGrid'
 import ScreenTitle from '../components/ScreenTitle'
 import ScrollRow from '../components/ScrollRow'
+import { randomPhrase } from '../lib/phrases'
 import {
   discover,
   genres,
@@ -20,7 +22,6 @@ import {
 
 const PER_ROW = 3
 const ROWS_STEP = 6 // 6 full rows at a time
-const PHRASES = ['Coming attractions', 'Now showing', 'Feature presentation', 'Previews']
 
 // "Amazon Prime Video" -> "Prime Video", "Disney Plus" -> "Disney+", "Peacock Premium" -> "Peacock"
 const shortName = (n: string) => n.replace(/^amazon /i, '').replace(/ plus$/i, '+').replace(/ premium$/i, '')
@@ -80,7 +81,7 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
   const q = query.trim()
 
   // carousel + browse
-  const [phrase] = useState(() => PHRASES[Math.floor(Math.random() * PHRASES.length)])
+  const [phrase] = useState(randomPhrase)
   const [hot, setHot] = useState<Title[]>([])
   const [type, setType] = useState<MediaType>('movie')
   const [filter, setFilter] = useState<Filter>({ genre: null, provider: null })
@@ -94,7 +95,6 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
   })
   const [rows, setRows] = useState(ROWS_STEP)
   const [more, setMore] = useState(false)
-  const [atBottom, setAtBottom] = useState(false)
 
   const key = `${type}:${filter.genre ?? 0}:${filter.provider ?? 0}`
   const loading = browse.key !== key
@@ -157,24 +157,6 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
-  // show the scroll-up button only when the page is scrolled all the way down
-  useEffect(() => {
-    const check = () => {
-      const doc = document.documentElement
-      setAtBottom(window.scrollY > 400 && window.innerHeight + window.scrollY >= doc.scrollHeight - 200)
-    }
-    check()
-    window.addEventListener('scroll', check, { passive: true })
-    window.addEventListener('resize', check)
-    const ro = new ResizeObserver(check)
-    ro.observe(document.body)
-    return () => {
-      window.removeEventListener('scroll', check)
-      window.removeEventListener('resize', check)
-      ro.disconnect()
-    }
-  }, [])
-
   async function loadMore() {
     const want = (rows + ROWS_STEP) * PER_ROW
     setMore(true)
@@ -205,11 +187,6 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
     onSelect(t)
   }
 
-  function focusSearch() {
-    inputRef.current?.focus({ preventScroll: true })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
   // back up to the divider, so the Movies / Series switch is still in reach
   function toBrowse() {
     const el = browseRef.current
@@ -231,7 +208,7 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
 
   return (
     <div>
-      <ScreenTitle title="Discover" />
+      <ScreenTitle title="Discover" icon="discover" />
 
       <div className="relative mb-5">
         <input
@@ -382,36 +359,7 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
         </>
       )}
 
-      {/* floating buttons, aligned to the right edge of the content column */}
-      <div
-        className="pointer-events-none fixed inset-x-0 z-[9]"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)' }}
-      >
-        <div className="mx-auto flex max-w-xl justify-end gap-3 px-4">
-          {atBottom && !q && (
-            <button
-              onClick={toBrowse}
-              aria-label="Back to browse filters"
-              className="anim-fade pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#1f1a24]/95 text-[#efe9df] shadow-lg shadow-black/50 backdrop-blur transition-transform active:scale-90"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-            </button>
-          )}
-          <button
-            onClick={focusSearch}
-            aria-label="Search"
-            className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg shadow-black/50 transition-transform active:scale-90"
-            style={{ background: 'var(--accent)', color: '#1a1008' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M20 20l-3.5-3.5" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <FloatingSearch target={inputRef} onUp={q ? undefined : toBrowse} />
     </div>
   )
 }

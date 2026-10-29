@@ -1,24 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
-
-const KEY = 'screengrave:episodes'
-type Watched = Record<string, string[]> // "tv-123" -> ["1-1", "1-2"]
+import { api, loadAll, reportSaveError, type EpisodeMap } from './api'
 
 const k = (season: number, episode: number) => `${season}-${episode}`
 
-function load(): Watched {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}')
-  } catch {
-    return {}
-  }
-}
-
 export function useEpisodes() {
-  const [watched, setWatched] = useState<Watched>(load)
+  const [watched, setWatched] = useState<EpisodeMap>({}) // "tv-123" -> ["1-1", "1-2"]
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(watched))
-  }, [watched])
+    let cancelled = false
+    loadAll()
+      .then((d) => {
+        if (!cancelled) setWatched(d.episodes)
+      })
+      .catch(() => {
+        // the library hook shows the error screen
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const isWatched = useCallback(
     (show: string, season: number, episode: number) => watched[show]?.includes(k(season, episode)) ?? false,
@@ -38,25 +38,33 @@ export function useEpisodes() {
   )
 
   const toggle = useCallback((show: string, season: number, episode: number) => {
+    const key = k(season, episode)
     setWatched((w) => {
       const cur = new Set(w[show] ?? [])
-      const key = k(season, episode)
-      if (cur.has(key)) cur.delete(key)
-      else cur.add(key)
+      if (cur.has(key)) {
+        cur.delete(key)
+        api.changeEpisodes(show, [], [key]).catch(reportSaveError)
+      } else {
+        cur.add(key)
+        api.changeEpisodes(show, [key], []).catch(reportSaveError)
+      }
       return { ...w, [show]: [...cur] }
     })
   }, [])
 
   const markSeason = useCallback((show: string, season: number, numbers: number[], value: boolean) => {
+    const keys = numbers.map((n) => k(season, n))
+    api.changeEpisodes(show, value ? keys : [], value ? [] : keys).catch(reportSaveError)
     setWatched((w) => {
       const cur = new Set(w[show] ?? [])
-      numbers.forEach((n) => (value ? cur.add(k(season, n)) : cur.delete(k(season, n))))
+      keys.forEach((key) => (value ? cur.add(key) : cur.delete(key)))
       return { ...w, [show]: [...cur] }
     })
   }, [])
 
   // merges many shows at once (used by "Watched" and the Trakt import later)
-  const addBulk = useCallback((data: Record<string, string[]>) => {
+  const addBulk = useCallback((data: EpisodeMap) => {
+    api.importData({}, data).catch(reportSaveError)
     setWatched((w) => {
       const next = { ...w }
       for (const [show, keys] of Object.entries(data)) {

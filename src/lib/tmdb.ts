@@ -1,5 +1,4 @@
-const TOKEN = import.meta.env.VITE_TMDB_TOKEN as string
-const BASE = 'https://api.themoviedb.org/3'
+const BASE = '/api/tmdb'
 
 export type MediaType = 'movie' | 'tv'
 
@@ -31,11 +30,9 @@ export const img = (path: string | null, size = 'w342') =>
   path ? `https://image.tmdb.org/t/p/${size}${path}` : null
 
 async function get(path: string, params: Record<string, string> = {}) {
-  const url = new URL(BASE + path)
+  const url = new URL(BASE + path, window.location.origin)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${TOKEN}`, accept: 'application/json' },
-  })
+  const res = await fetch(url, { headers: { accept: 'application/json' } })
   if (!res.ok) throw new Error(`TMDB error ${res.status}`)
   return res.json()
 }

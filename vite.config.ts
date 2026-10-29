@@ -4,12 +4,20 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  server: { host: true },
+  server: {
+    host: true,
+    proxy: {
+      '/api': 'http://localhost:8787',
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        navigateFallbackDenylist: [/^\/api\//],
+      },
       manifest: {
         name: 'ScreenGrave',
         short_name: 'ScreenGrave',

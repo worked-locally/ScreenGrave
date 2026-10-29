@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import FloatingSearch from '../components/FloatingSearch'
 import Poster from '../components/Poster'
-import { keyOf, type Library } from '../lib/library'
-import type { Title } from '../lib/tmdb'
 import ScreenTitle from '../components/ScreenTitle'
 import ScrollRow from '../components/ScrollRow'
+import { keyOf, type Library } from '../lib/library'
+import type { Title } from '../lib/tmdb'
 
 type Sort = 'year-desc' | 'year-asc' | 'title' | 'rating' | 'recent'
 
@@ -25,6 +26,7 @@ interface Props {
 export default function Watched({ library, onSelect }: Props) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('year-desc')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const all = Object.values(library).filter((e) => e.list === 'watched')
   const q = query.trim().toLowerCase()
@@ -59,10 +61,11 @@ export default function Watched({ library, onSelect }: Props) {
 
   return (
     <div>
-      <ScreenTitle title="Watched" count={all.length} />
+      <ScreenTitle title="Watched" count={all.length} icon="watched" />
 
       <div className="relative mb-3">
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search watched"
@@ -130,6 +133,8 @@ export default function Watched({ library, onSelect }: Props) {
           </div>
         </section>
       ))}
+
+      <FloatingSearch target={inputRef} />
     </div>
   )
 }

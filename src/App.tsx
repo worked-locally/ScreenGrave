@@ -2,6 +2,7 @@ import { useState } from 'react'
 import DetailSheet from './components/DetailSheet'
 import TabBar, { type Tab } from './components/TabBar'
 import TapEffects from './components/TapEffects'
+import UserMenu from './components/UserMenu'
 import { useEpisodes } from './lib/episodes'
 import { keyOf, useLibrary } from './lib/library'
 import { useShowInfo } from './lib/showinfo'
@@ -11,12 +12,11 @@ import Discover from './screens/Discover'
 import Upcoming from './screens/Upcoming'
 import Watched from './screens/Watched'
 import Watchlist from './screens/Watchlist'
-import UserMenu from './components/UserMenu'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('watchlist')
   const [selected, setSelected] = useState<Title | null>(null)
-  const { library, setList, remove } = useLibrary()
+  const { library, ready, error, setList, remove } = useLibrary()
   const ep = useEpisodes()
 
   const watchlistTitles = Object.values(library)
@@ -42,6 +42,30 @@ export default function App() {
     }
   }
 
+  if (error) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
+        <p className="text-lg font-semibold">Can't reach the ScreenGrave server</p>
+        <p className="text-sm text-[#8b8392]">Make sure the server is running, then try again.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-full px-5 py-2 text-sm font-semibold"
+          style={{ background: 'var(--accent)', color: '#1a1008' }}
+        >
+          Try again
+        </button>
+      </div>
+    )
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="anim-fade text-sm tracking-wide text-[#8b8392]">Loading your library…</p>
+      </div>
+    )
+  }
+
   return (
     <StatusContext.Provider value={{ library, info, count: ep.count }}>
       <div
@@ -53,7 +77,7 @@ export default function App() {
       >
         <TapEffects />
         <UserMenu />
-        
+
         <div key={tab} className="anim-fade">
           {tab === 'watchlist' && <Watchlist library={library} info={info} ep={ep} onSelect={setSelected} />}
           {tab === 'upcoming' && <Upcoming library={library} info={info} onSelect={setSelected} />}

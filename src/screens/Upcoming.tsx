@@ -1,3 +1,4 @@
+import ScreenTitle from '../components/ScreenTitle'
 import { keyOf, type Library } from '../lib/library'
 import { img, type Info, type Title } from '../lib/tmdb'
 
@@ -13,12 +14,15 @@ function dayParts(date: string) {
   const d = new Date(`${date}T00:00:00`)
   const today = new Date(`${todayStr()}T00:00:00`)
   const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000)
+  // show the year whenever the date isn't in the current year
+  const year = d.getFullYear() !== today.getFullYear() ? { year: 'numeric' as const } : {}
+
   let label: string
   if (diff === 0) label = 'Today'
   else if (diff === 1) label = 'Tomorrow'
   else if (diff < 7) label = d.toLocaleDateString(undefined, { weekday: 'long' })
-  else label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-  const short = diff < 7 ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''
+  else label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', ...year })
+  const short = diff < 7 ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...year }) : ''
   return { label, short }
 }
 
@@ -44,7 +48,7 @@ export default function Upcoming({ library, info, onSelect }: Props) {
 
   return (
     <div>
-      <h2 className="mb-5 text-2xl font-semibold tracking-tight">Upcoming</h2>
+      <ScreenTitle title="Upcoming" icon="upcoming" />
 
       {loading > 0 && <p className="mb-4 text-xs text-[#8b8392]">Checking {loading} titles…</p>}
 

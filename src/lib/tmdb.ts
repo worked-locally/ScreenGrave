@@ -33,6 +33,10 @@ async function get(path: string, params: Record<string, string> = {}) {
   const url = new URL(BASE + path, window.location.origin)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
   const res = await fetch(url, { headers: { accept: 'application/json' } })
+  if (res.status === 401) {
+    window.location.reload() // session expired or signed out elsewhere; the login screen takes over
+    throw new Error('Signed out')
+  }
   if (!res.ok) throw new Error(`TMDB error ${res.status}`)
   return res.json()
 }
@@ -104,6 +108,7 @@ export async function seasonEpisodes(id: number, season: number): Promise<Episod
 
 export interface Info {
   aired: number // episodes aired so far (shows only)
+  ended: boolean // the show is finished or canceled (shows only)
   release: string // release date (movies) or premiere date (shows)
   next: { date: string; label: string; name: string } | null
   fetchedAt: number
@@ -122,6 +127,7 @@ export async function fetchInfo(t: Title): Promise<Info> {
     const date = (d.release_date as string) || ''
     return {
       aired: 0,
+      ended: false,
       release: date,
       next: date ? { date, label: 'Movie', name: 'Release' } : null,
       fetchedAt: Date.now(),
@@ -143,6 +149,7 @@ export async function fetchInfo(t: Title): Promise<Info> {
 
   return {
     aired,
+    ended: d.status === 'Ended' || d.status === 'Canceled',
     release: (d.first_air_date as string) || '',
     next: nx?.air_date
       ? { date: nx.air_date, label: `S${nx.season_number} · E${nx.episode_number}`, name: nx.name ?? '' }

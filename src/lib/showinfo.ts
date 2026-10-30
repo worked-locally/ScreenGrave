@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { keyOf } from './library'
 import { fetchInfo, type Info, type Title } from './tmdb'
 
-const KEY = 'screengrave:info'
+const KEY = 'screengrave:info:v2'
 const TTL = 6 * 60 * 60 * 1000
 
 function load(): Record<string, Info> {

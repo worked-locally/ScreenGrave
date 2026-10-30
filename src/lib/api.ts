@@ -7,6 +7,10 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   })
+  if (res.status === 401) {
+    window.location.reload() // session expired or signed out elsewhere; the login screen takes over
+    throw new Error('Signed out')
+  }
   if (!res.ok) throw new Error(`Server error ${res.status} on ${path}`)
   return res.json() as Promise<T>
 }

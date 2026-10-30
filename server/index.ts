@@ -4,14 +4,23 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { existsSync } from 'node:fs'
 import { api } from './api'
+import { auth, AUTH_REQUIRED, requireAuth } from './auth'
+import { TMDB_TOKEN } from './tmdb'
+import { trakt } from './trakt'
 
 const PORT = Number(process.env.PORT ?? 8787)
-const TMDB_TOKEN = process.env.TMDB_TOKEN ?? process.env.VITE_TMDB_TOKEN ?? ''
 if (!TMDB_TOKEN) console.warn('[screengrave] TMDB_TOKEN is not set, so TMDB requests will fail.')
+if (!AUTH_REQUIRED) console.warn('[screengrave] APP_PASSWORD is not set, so login is turned off.')
 
 const app = new Hono()
 
+// every /api route below needs a signed-in session (health and /api/auth are exempt)
+app.use('/api/*', requireAuth)
+
 app.get('/api/health', (c) => c.json({ ok: true }))
+
+app.route('/api/auth', auth)
+app.route('/api/trakt', trakt)
 
 // TMDB proxy: the browser calls /api/tmdb/..., and the server adds the token
 app.get('/api/tmdb/*', async (c) => {
@@ -23,7 +32,8 @@ app.get('/api/tmdb/*', async (c) => {
     headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: 'application/json' },
   })
   return new Response(res.body, {
-    status: res.status,
+    // a TMDB 401 means a bad token, not a signed-out user, so it shouldn't trigger the login screen
+    status: res.status === 401 ? 502 : res.status,
     headers: {
       'content-type': res.headers.get('content-type') ?? 'application/json',
       'cache-control': 'private, max-age=300',

@@ -28,10 +28,10 @@ function dayParts(date: string) {
 
 export default function Upcoming({ library, info, onSelect }: Props) {
   const today = todayStr()
+  // your Watchlist plus caught-up shows in Watched, so their next episodes still show here
   const watchlist = Object.values(library)
-    .filter((e) => e.list === 'watchlist')
+    .filter((e) => e.list === 'watchlist' || (e.list === 'watched' && e.title.type === 'tv'))
     .map((e) => e.title)
-
   const upcoming = watchlist
     .map((t) => ({ t, next: info[keyOf(t)]?.next }))
     .filter((x): x is { t: Title; next: NonNullable<Info['next']> } => !!x.next && x.next.date >= today)

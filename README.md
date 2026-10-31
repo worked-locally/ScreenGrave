@@ -2,11 +2,11 @@
 
 > Track the shows and movies you love, in a clean, cinema-dark interface.
 
-**Version 0.4.5** · React + TypeScript · Node + SQLite · Installable PWA
+**Version 0.5.0** · React + TypeScript · Node + SQLite · Docker · Installable PWA
 
-ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is inspired by the clean look of Hobi and built as a calmer alternative to Trakt's busy interface. It runs on your own server, keeps your library in a small SQLite database, and can import your history from Trakt. Posters, trailers, genres, ratings, and episode data come from [TMDB](https://www.themoviedb.org/).
+ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is inspired by the clean look of Hobi and built as a calmer alternative to Trakt's busy interface. It runs on your own server in Docker, keeps your library in a small SQLite database, and can import your history from Trakt. Posters, trailers, genres, ratings, and episode data come from [TMDB](https://www.themoviedb.org/).
 
-**Contents:** [Features](#features) · [Upcoming and in development](#upcoming-and-in-development) · [Tech stack](#tech-stack) · [Getting API keys](#getting-api-keys) · [Getting started](#getting-started) · [Project layout](#project-layout) · [Changelog](#changelog) · [Credits](#credits)
+**Contents:** [Features](#features) · [Upcoming and in development](#upcoming-and-in-development) · [Tech stack](#tech-stack) · [Getting API keys](#getting-api-keys) · [Install with Docker](#install-with-docker) · [Development](#development) · [Project layout](#project-layout) · [Changelog](#changelog) · [Credits](#credits)
 
 ---
 
@@ -50,7 +50,8 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 ### Sign-in and Trakt
 - Password-protected: the server shows a sign-in page until you log in, and keeps you signed in for 30 days. Changing the password signs out every device.
-- **Connect Trakt** in the user menu imports your watched movies, your watched shows with episode progress, and your Trakt watchlist. It only adds what's missing and never overwrites your data.
+- **Connect Trakt** in the user menu shows a short code: enter it at trakt.tv on any device and you're connected. No redirect address or HTTPS needed, so it works on a plain local network too.
+- The first sync imports your watched movies, your watched shows with episode progress, and your Trakt watchlist. It only adds what's missing and never overwrites your data.
 - **Sync Now** re-runs the import, and only re-checks shows you've watched since the last sync.
 - Your Trakt login and TMDB key stay on the server and are never sent to the browser.
 
@@ -66,6 +67,19 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 | Feature | Status |
 | --- | --- |
+| HTTPS with your own domain (reverse proxy + Let's Encrypt) | In development |
+| Settings screen | Upcoming |
+| First-run setup (choose your password in the app) | Upcoming |
+| Onboarding: pick favorite genres, mark what you've watched, choose what you're watching | Upcoming |
+| **For You** tab on Discover with personal recommendations | Upcoming |
+| Show more than one upcoming episode per show | Upcoming |
+| Loading skeletons and a sliding tab-bar indicator | Upcoming |
+| Celebration effect when you finish a season or show | Upcoming |
+| Prebuilt Docker images on GitHub (no local build needed) | Upcoming |
+| Google (Gmail) sign-in | Upcoming |
+| Multi-user accounts | Upcoming |
+
+--- | --- |
 | Docker image and compose file | In development |
 | Self-hosting on a Linux server over HTTPS | In development |
 | Settings screen | Upcoming |
@@ -84,6 +98,7 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 - **Web app:** Vite, React, TypeScript, Tailwind CSS v4, `vite-plugin-pwa`, Inter font
 - **Server:** Node.js 24 with [Hono](https://hono.dev/), and Node's built-in SQLite (`node:sqlite`)
+- **Packaging:** Docker image (Node 24 slim) with Docker Compose
 - **Data:** TMDB API for titles and artwork, Trakt API for sync
 - Your library lives in `data/screengrave.db` on the server, shared by every device you sign in from
 
@@ -104,18 +119,34 @@ ScreenGrave needs a free TMDB key. Trakt is optional and only needed for Trakt s
 ### Trakt (optional)
 
 1. Sign in at [trakt.tv](https://trakt.tv/), then open the **[Trakt developer apps page](https://developer.trakt.tv/apps)**.
-2. Create a new app and give it any name, for example "ScreenGrave".
-3. Open the app's **Settings** and add this redirect URI:
-   ```
-   http://localhost:5173/api/trakt/callback
-   ```
-   When you host ScreenGrave on a server, also add `https://your-domain/api/trakt/callback`.
-4. Open the app's **Credentials** and copy the **Client ID**. No client secret is needed: ScreenGrave signs in with PKCE.
-5. Put it in `.env.local` as `TRAKT_CLIENT_ID`.
+2. Create a new app and give it any name, for example "ScreenGrave". A development app is fine, since you're its owner.
+3. Open the app's **Credentials** and copy the **Client ID**. No client secret is needed.
+4. Put it in your settings file as `TRAKT_CLIENT_ID`.
+
+That's it. ScreenGrave signs in to Trakt with a short code, so you don't need to register a redirect URI.
+
+> Optional: the menu also offers a redirect-based sign-in. Trakt development apps only allow `localhost` redirect addresses, so that method is mainly useful for local development.
 
 ---
 
-## Getting started
+## Install with Docker
+
+The quickest way to run ScreenGrave is on a Linux server on your home network:
+
+```bash
+git clone https://github.com/worked-locally/ScreenGrave.git
+cd ScreenGrave
+cp .env.example .env     # then fill in TMDB_TOKEN, APP_PASSWORD, and optionally TRAKT_CLIENT_ID
+docker compose up -d --build
+```
+
+Then open `http://<server-ip>:8787` on any device on your network.
+
+**Full guide:** [docs/install.md](docs/install.md), covering settings, connecting Trakt, updating, and backups.
+
+---
+
+## Development
 
 Requires [Node.js](https://nodejs.org/) **24 or newer** (for the built-in SQLite).
 
@@ -132,18 +163,19 @@ APP_USERNAME=YourName
 APP_PASSWORD=choose-a-password
 ```
 
-- Leave `APP_PASSWORD` out to turn sign-in off, which is handy for local development.
-- `TRAKT_REDIRECT_URI` defaults to `http://localhost:5173/api/trakt/callback`. On a server, set it to `https://your-domain/api/trakt/callback` and register the same address in your Trakt app.
+Leave `APP_PASSWORD` out to turn sign-in off, which is handy for local development.
 
 Then:
 
 ```powershell
 npm run dev       # web app at http://localhost:5173, plus the server on 8787
-npm run build     # production build in /dist
+npm run build     # type check and production build in /dist
 npm start         # serves the built app and API at http://localhost:8787
 ```
 
-> `.env.local` and `data/` are gitignored, so never commit them. `TMDB_TOKEN`, `TRAKT_CLIENT_ID`, and the password stay on the server and are never sent to the browser.
+> `.env.local`, `.env`, and `data/` are gitignored, so never commit them. `TMDB_TOKEN`, `TRAKT_CLIENT_ID`, and the password stay on the server and are never sent to the browser.
+
+The version number lives only in `package.json`. The app and server both read it from there.
 
 ---
 
@@ -157,7 +189,9 @@ src/
   screens/      Watchlist, Upcoming, Discover, Watched, Login
   lib/          api.ts, auth.ts, trakt.ts, tmdb.ts, library.ts, episodes.ts, showinfo.ts, status.ts
 public/         app icons
-data/           screengrave.db (created on first run)
+docs/           install guide
+data/           screengrave.db (created on first run, local development)
+Dockerfile, docker-compose.yml, .env.example
 ```
 
 ---
@@ -165,6 +199,28 @@ data/           screengrave.db (created on first run)
 ## Changelog
 
 <details open>
+<summary><strong>0.5.0 (Day 5)</strong></summary>
+
+**New**
+- Docker packaging: a `Dockerfile` (Node 24 slim, health check, runs as a non-root user) and `docker-compose.yml` with a data volume and auto-restart.
+- Runs on plain HTTP on port 8787 by default, so it works on a home network with no domain or certificate.
+- Trakt **device sign-in**: Connect Trakt shows a short code to enter at trakt.tv. No redirect address needed, so it works on any address, including LAN IPs over HTTP.
+- Tap the code to copy it, with a fallback that also works on plain-HTTP pages and iPhone Safari.
+- The redirect sign-in is still available as an option, and its redirect address is now worked out automatically from the address you're using.
+- New install guide: [docs/install.md](docs/install.md).
+
+**Improvements**
+- The version number now lives only in `package.json`. The About screen, the health check, and the server all read it from there.
+- The server shuts down cleanly when Docker stops it, so the database closes properly.
+- The Docker image only contains what the server needs at runtime.
+- `.env` (the Docker settings file) is gitignored, and `.env.example` documents every setting.
+
+**Found during testing**
+- Trakt development apps only accept `localhost` redirect addresses, which is why device sign-in is now the default.
+
+</details>
+
+<details>
 <summary><strong>0.4.5 (Day 4, part 2)</strong></summary>
 
 **New**

@@ -5,8 +5,10 @@ import { Hono } from 'hono'
 import { existsSync } from 'node:fs'
 import { api } from './api'
 import { auth, AUTH_REQUIRED, requireAuth } from './auth'
+import { db } from './db'
 import { TMDB_TOKEN } from './tmdb'
 import { trakt } from './trakt'
+import { VERSION } from './version'
 
 const PORT = Number(process.env.PORT ?? 8787)
 if (!TMDB_TOKEN) console.warn('[screengrave] TMDB_TOKEN is not set, so TMDB requests will fail.')
@@ -17,7 +19,7 @@ const app = new Hono()
 // every /api route below needs a signed-in session (health and /api/auth are exempt)
 app.use('/api/*', requireAuth)
 
-app.get('/api/health', (c) => c.json({ ok: true }))
+app.get('/api/health', (c) => c.json({ ok: true, version: VERSION }))
 
 app.route('/api/auth', auth)
 app.route('/api/trakt', trakt)
@@ -53,6 +55,20 @@ if (existsSync('dist')) {
   app.get('*', serveStatic({ path: './dist/index.html' }))
 }
 
-serve({ fetch: app.fetch, port: PORT }, (info) => {
-  console.log(`[screengrave] server running on http://localhost:${info.port}`)
+const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
+  console.log(`[screengrave] v${VERSION} running on http://localhost:${info.port}`)
 })
+
+// shut down cleanly when Docker (or Ctrl+C) stops the server, so the database is closed properly
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, () => {
+    console.log(`[screengrave] ${signal} received, shutting down`)
+    server.close()
+    try {
+      db.close()
+    } catch {
+      // already closed
+    }
+    process.exit(0)
+  })
+}

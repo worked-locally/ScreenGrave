@@ -1,13 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { db } from './db'
 import { fetchTitle, type Title } from './tmdb'
+import { VERSION } from './version'
 
 const CLIENT_ID = process.env.TRAKT_CLIENT_ID ?? process.env.VITE_TRAKT_CLIENT_ID ?? ''
-const REDIRECT_URI = process.env.TRAKT_REDIRECT_URI ?? 'http://localhost:5173/api/trakt/callback'
+const REDIRECT_OVERRIDE = process.env.TRAKT_REDIRECT_URI?.trim() ?? ''
 const AUTH_URL = process.env.TRAKT_AUTH_URL ?? 'https://auth.trakt.tv'
 const API_URL = 'https://api.trakt.tv'
-const UA = 'ScreenGrave/0.4.5'
+const UA = `ScreenGrave/${VERSION}`
 
 if (!CLIENT_ID) console.warn('[screengrave] TRAKT_CLIENT_ID is not set, so Trakt sync is turned off.')
 
@@ -25,6 +26,22 @@ function readSetting<T>(key: string): T | null {
 }
 const writeSetting = (key: string, value: unknown) => putSetting.run(key, JSON.stringify(value))
 
+// ----- redirect address -----
+// Worked out from the address you're browsing on, so the same build works on localhost,
+// a LAN IP like http://192.168.1.50:8787, or https://your-domain behind a reverse proxy.
+// TRAKT_REDIRECT_URI overrides it.
+
+function redirectFor(c: Context): string {
+  if (REDIRECT_OVERRIDE) return REDIRECT_OVERRIDE
+  const url = new URL(c.req.url)
+  const proto = (c.req.header('x-forwarded-proto') ?? url.protocol.replace(':', '')).split(',')[0].trim()
+  const host = (c.req.header('x-forwarded-host') ?? c.req.header('host') ?? url.host).split(',')[0].trim()
+  return `${proto}://${host}/api/trakt/callback`
+}
+
+// the address used when you connected; token refreshes must send the same one
+const savedRedirect = () => readSetting<string>('trakt_redirect') ?? REDIRECT_OVERRIDE
+
 // ----- tokens -----
 
 interface Tokens {
@@ -33,7 +50,7 @@ interface Tokens {
   expiresAt: number
 }
 
-async function tokenRequest(params: Record<string, string>): Promise<Tokens> {
+async function tokenRequest(redirectUri: string, params: Record<string, string>): Promise<Tokens> {
   const res = await fetch(`${AUTH_URL}/oauth/token`, {
     method: 'POST',
     headers: {
@@ -41,7 +58,7 @@ async function tokenRequest(params: Record<string, string>): Promise<Tokens> {
       accept: 'application/json',
       'user-agent': UA,
     },
-    body: new URLSearchParams({ client_id: CLIENT_ID, redirect_uri: REDIRECT_URI, ...params }),
+    body: new URLSearchParams({ client_id: CLIENT_ID, redirect_uri: redirectUri, ...params }),
   })
   const text = await res.text()
   if (!res.ok) throw new Error(`Trakt token request failed (${res.status}): ${text.slice(0, 300)}`)
@@ -61,7 +78,7 @@ async function accessToken(): Promise<string> {
   // expired or about to: swap the refresh token for a new pair
   try {
     if (!t.refresh) throw new Error('no refresh token')
-    const fresh = await tokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh })
+    const fresh = await tokenRequest(savedRedirect(), { grant_type: 'refresh_token', refresh_token: t.refresh })
     if (!fresh.refresh) fresh.refresh = t.refresh
     writeSetting('trakt_tokens', fresh)
     return fresh.access
@@ -213,7 +230,7 @@ async function runSync() {
 
 // ----- routes -----
 
-const pending = new Map<string, { verifier: string; at: number }>() // sign-ins in progress
+const pending = new Map<string, { verifier: string; redirect: string; at: number }>() // sign-ins in progress
 let syncing = false
 
 export const trakt = new Hono()
@@ -223,6 +240,7 @@ trakt.get('/status', (c) =>
     configured: !!CLIENT_ID,
     connected: !!readSetting<Tokens>('trakt_tokens'),
     lastSync: readSetting<number>('trakt_last_sync'),
+    redirectUri: redirectFor(c),
   }),
 )
 
@@ -234,13 +252,14 @@ trakt.get('/connect', (c) => {
 
   const verifier = randomBytes(32).toString('base64url')
   const state = randomBytes(16).toString('base64url')
-  pending.set(state, { verifier, at: now })
+  const redirect = redirectFor(c)
+  pending.set(state, { verifier, redirect, at: now })
 
   const url = new URL('/oauth/authorize', AUTH_URL)
   url.search = new URLSearchParams({
     response_type: 'code',
     client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirect,
     state,
     code_challenge: createHash('sha256').update(verifier).digest('base64url'),
     code_challenge_method: 'S256',
@@ -257,7 +276,11 @@ trakt.get('/callback', async (c) => {
   if (!code || !p) return c.redirect('/?trakt=error')
 
   try {
-    writeSetting('trakt_tokens', await tokenRequest({ grant_type: 'authorization_code', code, code_verifier: p.verifier }))
+    writeSetting(
+      'trakt_tokens',
+      await tokenRequest(p.redirect, { grant_type: 'authorization_code', code, code_verifier: p.verifier }),
+    )
+    writeSetting('trakt_redirect', p.redirect)
     return c.redirect('/?trakt=connected')
   } catch (e) {
     console.error('[screengrave]', e)

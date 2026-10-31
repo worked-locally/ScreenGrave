@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { logout } from '../lib/auth'
 import { traktConnect, traktDisconnect, traktStatus, traktSync, type TraktStatus } from '../lib/trakt'
 
-type View = 'menu' | 'about' | 'note' | 'busy'
+type View = 'menu' | 'about' | 'note' | 'busy' | 'connect'
 
 interface Props {
   username: string
@@ -47,6 +47,7 @@ export default function UserMenu({ username, canLogout }: Props) {
   const [view, setView] = useState<View>('menu')
   const [note, setNote] = useState('')
   const [trakt, setTrakt] = useState<TraktStatus | null>(null)
+  const [copied, setCopied] = useState(false)
 
   function refreshTrakt() {
     traktStatus()
@@ -177,11 +178,14 @@ export default function UserMenu({ username, canLogout }: Props) {
                         ? 'Not set up on the server'
                         : 'Import your watched history and watchlist'
                     }
-                    onClick={() =>
-                      trakt?.configured === false
-                        ? go('note', 'Add TRAKT_CLIENT_ID to the server settings to turn on Trakt sync.')
-                        : traktConnect()
-                    }
+                    onClick={() => {
+                      if (trakt?.configured === false) {
+                        go('note', 'Add TRAKT_CLIENT_ID to the server settings to turn on Trakt sync.')
+                      } else {
+                        setCopied(false)
+                        go('connect')
+                      }
+                    }}
                   />
                 )}
                 <Row label="Settings" onClick={() => go('note', 'Settings are coming soon.')} />
@@ -206,10 +210,46 @@ export default function UserMenu({ username, canLogout }: Props) {
               </div>
             )}
 
+            {view === 'connect' && (
+              <div className="p-3">
+                <p className="text-sm font-semibold">Connect Trakt</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#8b8392]">
+                  First, add this redirect URI in your Trakt app's settings:
+                </p>
+                <input
+                  readOnly
+                  value={trakt?.redirectUri ?? ''}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="mt-2 w-full rounded-lg bg-[#16131a] px-2.5 py-2 font-mono text-[11px] text-[#cdc6bd] outline-none"
+                />
+                {typeof navigator !== 'undefined' && navigator.clipboard && (
+                  <button
+                    onClick={() => {
+                      void navigator.clipboard.writeText(trakt?.redirectUri ?? '').then(() => setCopied(true))
+                    }}
+                    className="mt-1.5 text-xs"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                )}
+                <div className="mt-3 flex items-center justify-between">
+                  {back}
+                  <button
+                    onClick={traktConnect}
+                    className="rounded-full px-4 py-1.5 text-sm font-semibold"
+                    style={{ background: 'var(--accent)', color: '#1a1008' }}
+                  >
+                    Continue to Trakt
+                  </button>
+                </div>
+              </div>
+            )}
+
             {view === 'about' && (
               <div className="p-3">
                 <p className="text-sm font-semibold">
-                  ScreenGrave <span className="text-xs font-normal text-[#8b8392]">v0.4.5</span>
+                  ScreenGrave <span className="text-xs font-normal text-[#8b8392]">v{__APP_VERSION__}</span>
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-[#8b8392]">
                   A clean tracker for the shows and movies you love.

@@ -1,0 +1,15 @@
+services:
+  screengrave:
+    build: .
+    image: screengrave:local
+    container_name: screengrave
+    restart: unless-stopped
+    init: true
+    ports:
+      - "8787:8787"
+    env_file: .env
+    volumes:
+      - screengrave-data:/app/data
+
+volumes:
+  screengrave-data:

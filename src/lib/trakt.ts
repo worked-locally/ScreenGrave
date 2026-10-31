@@ -2,6 +2,7 @@ export interface TraktStatus {
   configured: boolean
   connected: boolean
   lastSync: number | null
+  redirectUri: string
 }
 
 export interface SyncResult {

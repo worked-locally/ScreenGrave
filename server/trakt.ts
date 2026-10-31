@@ -50,7 +50,11 @@ interface Tokens {
   expiresAt: number
 }
 
+const OOB = 'urn:ietf:wg:oauth:2.0:oob' // "no redirect", used for device sign-in
+
 async function tokenRequest(redirectUri: string, params: Record<string, string>): Promise<Tokens> {
+  const body = new URLSearchParams({ client_id: CLIENT_ID, ...params })
+  if (redirectUri) body.set('redirect_uri', redirectUri)
   const res = await fetch(`${AUTH_URL}/oauth/token`, {
     method: 'POST',
     headers: {
@@ -58,10 +62,14 @@ async function tokenRequest(redirectUri: string, params: Record<string, string>)
       accept: 'application/json',
       'user-agent': UA,
     },
-    body: new URLSearchParams({ client_id: CLIENT_ID, redirect_uri: redirectUri, ...params }),
+    body,
   })
   const text = await res.text()
   if (!res.ok) throw new Error(`Trakt token request failed (${res.status}): ${text.slice(0, 300)}`)
+  return parseTokens(text)
+}
+
+function parseTokens(text: string): Tokens {
   const d = JSON.parse(text) as { access_token: string; refresh_token?: string; expires_in?: number }
   return {
     access: d.access_token,
@@ -78,7 +86,12 @@ async function accessToken(): Promise<string> {
   // expired or about to: swap the refresh token for a new pair
   try {
     if (!t.refresh) throw new Error('no refresh token')
-    const fresh = await tokenRequest(savedRedirect(), { grant_type: 'refresh_token', refresh_token: t.refresh })
+    const params = { grant_type: 'refresh_token', refresh_token: t.refresh }
+    const redirect = savedRedirect()
+    // device sign-in tokens may refresh with or without a redirect_uri; try both
+    const fresh = await tokenRequest(redirect, params).catch((e) =>
+      redirect === OOB ? tokenRequest('', params) : Promise.reject(e),
+    )
     if (!fresh.refresh) fresh.refresh = t.refresh
     writeSetting('trakt_tokens', fresh)
     return fresh.access
@@ -285,6 +298,75 @@ trakt.get('/callback', async (c) => {
   } catch (e) {
     console.error('[screengrave]', e)
     return c.redirect('/?trakt=error')
+  }
+})
+
+// ----- device sign-in: show a code, the user enters it at trakt.tv, no redirect address needed -----
+
+let device: { code: string; interval: number; expiresAt: number } | null = null
+
+async function deviceRequest(path: string, payload: Record<string, string>) {
+  return fetch(`${AUTH_URL}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': UA },
+    body: JSON.stringify(payload),
+  })
+}
+
+trakt.post('/device/start', async (c) => {
+  if (!CLIENT_ID) return c.json({ error: 'TRAKT_CLIENT_ID is not set on the server.' }, 500)
+  const res = await deviceRequest('/oauth/device/code', { client_id: CLIENT_ID })
+  const text = await res.text()
+  if (!res.ok) {
+    console.error(`[screengrave] Trakt device code failed (${res.status}): ${text.slice(0, 300)}`)
+    return c.json({ error: `Trakt refused the request (${res.status}).` }, 502)
+  }
+  const d = JSON.parse(text) as {
+    device_code: string
+    user_code: string
+    verification_url: string
+    expires_in: number
+    interval: number
+  }
+  device = { code: d.device_code, interval: d.interval || 5, expiresAt: Date.now() + d.expires_in * 1000 }
+  return c.json({
+    userCode: d.user_code,
+    verificationUrl: d.verification_url,
+    interval: device.interval,
+    expiresIn: d.expires_in,
+  })
+})
+
+trakt.post('/device/poll', async (c) => {
+  if (!device || Date.now() > device.expiresAt) {
+    device = null
+    return c.json({ status: 'expired' })
+  }
+  const res = await deviceRequest('/oauth/device/token', { code: device.code, client_id: CLIENT_ID })
+  const text = await res.text()
+
+  if (res.ok) {
+    device = null
+    writeSetting('trakt_tokens', parseTokens(text))
+    writeSetting('trakt_redirect', OOB)
+    return c.json({ status: 'connected' })
+  }
+  switch (res.status) {
+    case 400:
+      return c.json({ status: 'pending' }) // not approved yet
+    case 429:
+      return c.json({ status: 'slow_down' })
+    case 418:
+      device = null
+      return c.json({ status: 'denied' })
+    case 404:
+    case 409:
+    case 410:
+      device = null
+      return c.json({ status: 'expired' })
+    default:
+      console.error(`[screengrave] Trakt device token failed (${res.status}): ${text.slice(0, 300)}`)
+      return c.json({ status: 'error', message: `Trakt error ${res.status}` })
   }
 })
 

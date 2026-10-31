@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { logout } from '../lib/auth'
-import { traktConnect, traktDisconnect, traktStatus, traktSync, type TraktStatus } from '../lib/trakt'
+import {
+  traktConnect,
+  traktDevicePoll,
+  traktDeviceStart,
+  traktDisconnect,
+  traktStatus,
+  traktSync,
+  type DeviceCode,
+  type TraktStatus,
+} from '../lib/trakt'
 
 type View = 'menu' | 'about' | 'note' | 'busy' | 'connect'
 
@@ -48,6 +57,20 @@ export default function UserMenu({ username, canLogout }: Props) {
   const [note, setNote] = useState('')
   const [trakt, setTrakt] = useState<TraktStatus | null>(null)
   const [copied, setCopied] = useState(false)
+  const [device, setDevice] = useState<DeviceCode | null>(null)
+  const [deviceMsg, setDeviceMsg] = useState('')
+  const [showRedirect, setShowRedirect] = useState(false)
+
+  async function startDevice() {
+    setDevice(null)
+    setDeviceMsg('Getting a code from Trakt…')
+    try {
+      setDevice(await traktDeviceStart())
+      setDeviceMsg('')
+    } catch (e) {
+      setDeviceMsg(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   function refreshTrakt() {
     traktStatus()
@@ -98,6 +121,43 @@ export default function UserMenu({ username, canLogout }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // while a device code is showing, ask the server every few seconds whether it was approved
+  useEffect(() => {
+    if (!device) return
+    let cancelled = false
+    let wait = device.interval * 1000
+    let timer = 0
+    const tick = async () => {
+      const status = await traktDevicePoll()
+      if (cancelled) return
+      if (status === 'connected') {
+        setDevice(null)
+        refreshTrakt()
+        void runSync('Connected to Trakt. Importing your library…')
+        return
+      }
+      if (status === 'denied' || status === 'expired' || status === 'error') {
+        setDevice(null)
+        setDeviceMsg(
+          status === 'denied'
+            ? 'Sign-in was declined on Trakt.'
+            : status === 'expired'
+              ? 'That code expired.'
+              : 'Something went wrong talking to Trakt.',
+        )
+        return
+      }
+      if (status === 'slow_down') wait += 5000
+      timer = window.setTimeout(() => void tick(), wait)
+    }
+    timer = window.setTimeout(() => void tick(), wait)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [device])
 
   useEffect(() => {
     if (!open) return
@@ -183,7 +243,9 @@ export default function UserMenu({ username, canLogout }: Props) {
                         go('note', 'Add TRAKT_CLIENT_ID to the server settings to turn on Trakt sync.')
                       } else {
                         setCopied(false)
+                        setShowRedirect(false)
                         go('connect')
+                        void startDevice()
                       }
                     }}
                   />
@@ -213,36 +275,116 @@ export default function UserMenu({ username, canLogout }: Props) {
             {view === 'connect' && (
               <div className="p-3">
                 <p className="text-sm font-semibold">Connect Trakt</p>
-                <p className="mt-1 text-xs leading-relaxed text-[#8b8392]">
-                  First, add this redirect URI in your Trakt app's settings:
-                </p>
-                <input
-                  readOnly
-                  value={trakt?.redirectUri ?? ''}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="mt-2 w-full rounded-lg bg-[#16131a] px-2.5 py-2 font-mono text-[11px] text-[#cdc6bd] outline-none"
-                />
-                {typeof navigator !== 'undefined' && navigator.clipboard && (
-                  <button
-                    onClick={() => {
-                      void navigator.clipboard.writeText(trakt?.redirectUri ?? '').then(() => setCopied(true))
-                    }}
-                    className="mt-1.5 text-xs"
-                    style={{ color: 'var(--accent)' }}
-                  >
-                    {copied ? 'Copied' : 'Copy'}
-                  </button>
+
+                {!showRedirect && (
+                  <>
+                    {device ? (
+                      <>
+                        <p className="mt-1 text-xs leading-relaxed text-[#8b8392]">
+                          Go to{' '}
+                          <a
+                            href={device.verificationUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                            style={{ color: 'var(--accent)' }}
+                          >
+                            {device.verificationUrl.replace(/^https?:\/\//, '')}
+                          </a>{' '}
+                          on any device and enter this code:
+                        </p>
+                        <p className="mt-3 select-all text-center font-mono text-2xl font-semibold tracking-[0.2em]">
+                          {device.userCode}
+                        </p>
+                        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-[#8b8392]">
+                          <span
+                            className="h-3 w-3 animate-spin rounded-full border-2 border-white/15"
+                            style={{ borderTopColor: 'var(--accent)' }}
+                          />
+                          Waiting for you to approve…
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-2">
+                        <p className="text-xs leading-relaxed text-[#8b8392]">{deviceMsg}</p>
+                        {deviceMsg && !deviceMsg.startsWith('Getting') && (
+                          <button
+                            onClick={() => void startDevice()}
+                            className="mt-2 text-xs"
+                            style={{ color: 'var(--accent)' }}
+                          >
+                            Get a new code
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex items-center justify-between">
+                      <button
+                        onClick={() => {
+                          setDevice(null)
+                          setView('menu')
+                        }}
+                        className="text-sm text-[#8b8392]"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDevice(null)
+                          setShowRedirect(true)
+                        }}
+                        className="text-[11px] text-[#6b6473] underline"
+                      >
+                        Use redirect sign-in instead
+                      </button>
+                    </div>
+                  </>
                 )}
-                <div className="mt-3 flex items-center justify-between">
-                  {back}
-                  <button
-                    onClick={traktConnect}
-                    className="rounded-full px-4 py-1.5 text-sm font-semibold"
-                    style={{ background: 'var(--accent)', color: '#1a1008' }}
-                  >
-                    Continue to Trakt
-                  </button>
-                </div>
+
+                {showRedirect && (
+                  <>
+                    <p className="mt-1 text-xs leading-relaxed text-[#8b8392]">
+                      Add this redirect URI in your Trakt app's settings first. Development apps only accept
+                      localhost addresses.
+                    </p>
+                    <input
+                      readOnly
+                      value={trakt?.redirectUri ?? ''}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="mt-2 w-full rounded-lg bg-[#16131a] px-2.5 py-2 font-mono text-[11px] text-[#cdc6bd] outline-none"
+                    />
+                    {typeof navigator !== 'undefined' && navigator.clipboard && (
+                      <button
+                        onClick={() => {
+                          void navigator.clipboard.writeText(trakt?.redirectUri ?? '').then(() => setCopied(true))
+                        }}
+                        className="mt-1.5 text-xs"
+                        style={{ color: 'var(--accent)' }}
+                      >
+                        {copied ? 'Copied' : 'Copy'}
+                      </button>
+                    )}
+                    <div className="mt-3 flex items-center justify-between">
+                      <button
+                        onClick={() => {
+                          setShowRedirect(false)
+                          void startDevice()
+                        }}
+                        className="text-sm text-[#8b8392]"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={traktConnect}
+                        className="rounded-full px-4 py-1.5 text-sm font-semibold"
+                        style={{ background: 'var(--accent)', color: '#1a1008' }}
+                      >
+                        Continue to Trakt
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

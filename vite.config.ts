@@ -6,9 +6,13 @@ import { readFileSync } from 'node:fs'
 
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }
 
+// a new id for every build, so an installed app can tell when the server has a newer one
+const BUILD_ID = String(Date.now())
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(version),
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
   },
   server: {
     host: true,
@@ -17,6 +21,14 @@ export default defineConfig({
     },
   },
   plugins: [
+    {
+      // writes dist/build.json, which the app checks on start to catch stale cached copies
+      name: 'screengrave-build-id',
+      apply: 'build',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'build.json', source: JSON.stringify({ build: BUILD_ID, version }) })
+      },
+    },
     react(),
     tailwindcss(),
     VitePWA({
@@ -24,6 +36,9 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'favicon-32x32.png', 'apple-touch-icon.png'],
       workbox: {
         navigateFallbackDenylist: [/^\/api\//],
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
       },
       manifest: {
         name: 'ScreenGrave',

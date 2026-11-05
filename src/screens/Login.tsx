@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from 'react'
-import { login } from '../lib/auth'
+import { SecretInput } from '../components/SignInChoice'
+import { login, type Method } from '../lib/auth'
 
 interface Props {
   username: string
+  method: Method
   onSuccess: () => void
 }
 
-export default function Login({ username, onSuccess }: Props) {
+export default function Login({ username, method, onSuccess }: Props) {
+  const word = method === 'pin' ? 'PIN' : 'password'
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -25,7 +28,7 @@ export default function Login({ username, onSuccess }: Props) {
     setPassword('')
     setMessage(
       result === 'wrong'
-        ? 'Wrong password. Try again.'
+        ? `Wrong ${word}. Try again.`
         : result === 'locked'
           ? 'Too many attempts. Wait a few minutes and try again.'
           : "Couldn't reach the server.",
@@ -43,13 +46,12 @@ export default function Login({ username, onSuccess }: Props) {
         {/* lets password managers and iCloud Keychain remember the login */}
         <input type="text" name="username" autoComplete="username" value={username} readOnly hidden />
 
-        <input
-          type="password"
-          name="password"
-          autoComplete="current-password"
+        <SecretInput
+          method={method}
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
+          onChange={setPassword}
+          placeholder={method === 'pin' ? 'PIN' : 'Password'}
+          autoComplete="current-password"
           autoFocus
           className="mt-8 w-full rounded-2xl bg-[#1f1a24] px-4 py-3.5 text-base outline-none placeholder:text-[#8b8392]"
         />

@@ -2,13 +2,16 @@ export interface TraktStatus {
   configured: boolean
   connected: boolean
   lastSync: number | null
+  pending?: number // your changes still waiting to be sent to Trakt
   redirectUri: string
 }
 
 export interface SyncResult {
-  titles: number
+  titles: number // added to ScreenGrave from Trakt
   episodes: number
   skipped: number
+  uploaded?: number // first-time upload to Trakt
+  sent?: number // your changes sent to Trakt
 }
 
 export async function traktStatus(): Promise<TraktStatus> {

@@ -2,9 +2,9 @@
 
 > Track the shows and movies you love, in a clean, cinema-dark interface.
 
-**Version 0.5.0** · React + TypeScript · Node + SQLite · Docker · Installable PWA
+**Version 0.7.0** · React + TypeScript · Node + SQLite · Docker · Installable PWA
 
-ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is inspired by the clean look of Hobi and built as a calmer alternative to Trakt's busy interface. It runs on your own server in Docker, keeps your library in a small SQLite database, and can import your history from Trakt. Posters, trailers, genres, ratings, and episode data come from [TMDB](https://www.themoviedb.org/).
+ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is inspired by the clean look of Hobi and built as a calmer alternative to Trakt's busy interface. It runs on your own server in Docker, keeps your library in a small SQLite database, and can sync both ways with Trakt. Posters, trailers, genres, ratings, and episode data come from [TMDB](https://www.themoviedb.org/).
 
 **Contents:** [Features](#features) · [Upcoming and in development](#upcoming-and-in-development) · [Tech stack](#tech-stack) · [Getting API keys](#getting-api-keys) · [Install with Docker](#install-with-docker) · [Development](#development) · [Project layout](#project-layout) · [Changelog](#changelog) · [Credits](#credits)
 
@@ -48,18 +48,32 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 - Marking a show **Watched** checks off every aired episode in every season.
 - Close with the X button or by tapping the blurred background. The page behind stays put.
 
-### Sign-in and Trakt
-- Password-protected: the server shows a sign-in page until you log in, and keeps you signed in for 30 days. Changing the password signs out every device.
+### Sign-in
+- **First-run setup:** pick your name and how to sign in: a **PIN** (4 to 8 numbers, recommended), a **password**, or **no sign-in** (with a warning).
+- Stays signed in for 30 days. Wrong guesses are throttled, and changing your PIN or password signs out every other device.
+- Prefer config files? `APP_PASSWORD` in `.env` still works and takes over from the in-app choice.
+
+### Trakt
 - **Connect Trakt** in the user menu shows a short code: enter it at trakt.tv on any device and you're connected. No redirect address or HTTPS needed, so it works on a plain local network too.
-- The first sync imports your watched movies, your watched shows with episode progress, and your Trakt watchlist. It only adds what's missing and never overwrites your data.
-- **Sync Now** re-runs the import, and only re-checks shows you've watched since the last sync.
+- **Two-way sync:** what you add, remove, or check off in ScreenGrave is sent to Trakt within seconds, removals included. Changes are batched and retried if Trakt is down.
+- The first sync pulls in your Trakt history and watchlist, then uploads anything Trakt was missing, without duplicate plays.
+- Titles you remove stay removed: the next sync won't bring them back unless you watch them again on Trakt.
+- Smart Watchlist moves stay inside ScreenGrave and never touch your Trakt watchlist.
 - Your Trakt login and TMDB key stay on the server and are never sent to the browser.
+
+### Notifications
+- One daily message with new episodes of shows you follow and Watchlist movies released that day, at the hour you pick.
+- Sends to **Discord, ntfy, Gotify, Telegram**, or any **webhook**. Nothing is sent on quiet days, and nothing twice.
+
+### Settings
+- Display name, sign-in method, Trakt status and two-way sync, notifications, and your **country** (used for release dates and the streaming services on Discover).
 
 ### Look and feel
 - "After-hours cinema" theme: plum-black surfaces, ember-amber accent, teal for done states.
 - Popcorn-bucket tombstone app icon for the browser tab and the iPhone home screen.
 - Icon tab bar, page titles with matching icons, tap ripple and sparkle, slide-up sheets, film-themed section dividers.
 - Respects the "reduce motion" setting.
+- Installed copies update themselves: after a new version is deployed, the app notices and reloads once.
 
 ---
 
@@ -67,15 +81,12 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 | Feature | Status |
 | --- | --- |
-| HTTPS with your own domain (reverse proxy + Let's Encrypt) | In development |
-| Settings screen | Upcoming |
-| First-run setup (choose your password in the app) | Upcoming |
-| Onboarding: pick favorite genres, mark what you've watched, choose what you're watching | Upcoming |
-| **For You** tab on Discover with personal recommendations | Upcoming |
+| Onboarding: pick favorite genres, mark what you've watched, choose what you're watching | In development |
+| **For You** on Discover with personal recommendations, plus "Popular in your country" | In development |
+| Sign in with Face ID or Touch ID (passkeys) | Upcoming |
 | Show more than one upcoming episode per show | Upcoming |
 | Loading skeletons and a sliding tab-bar indicator | Upcoming |
 | Celebration effect when you finish a season or show | Upcoming |
-| Notifications for new episodes and releases (Discord, ntfy, Gotify, Telegram, webhook) | Upcoming |
 | Prebuilt Docker images on GitHub (no local build needed) | Upcoming |
 | Google (Gmail) sign-in | Upcoming |
 | Multi-user accounts | Upcoming |
@@ -124,11 +135,11 @@ The quickest way to run ScreenGrave is on a Linux server on your home network:
 ```bash
 git clone https://github.com/worked-locally/ScreenGrave.git
 cd ScreenGrave
-cp .env.example .env     # then fill in TMDB_TOKEN, APP_PASSWORD, and optionally TRAKT_CLIENT_ID
+cp .env.example .env     # then fill in TMDB_TOKEN, and optionally TRAKT_CLIENT_ID
 docker compose up -d --build
 ```
 
-Then open `http://<server-ip>:8787` on any device on your network.
+Then open `http://<server-ip>:8787` on any device on your network and choose how to sign in. Do this right away, since the first person to open it gets to choose.
 
 **Full guide:** [docs/install.md](docs/install.md), covering settings, connecting Trakt, updating, and backups.
 
@@ -147,11 +158,11 @@ Create a file named `.env.local` in the project root:
 ```
 TMDB_TOKEN=your_tmdb_read_access_token
 TRAKT_CLIENT_ID=your_trakt_client_id
-APP_USERNAME=YourName
-APP_PASSWORD=choose-a-password
 ```
 
-Leave `APP_PASSWORD` out to turn sign-in off, which is handy for local development.
+The first time you open the app, it asks how you want to sign in. Add `AUTH_DISABLED=true` to skip sign-in entirely while developing.
+
+> Your development database is separate from your server's. If it's connected to the same Trakt account, Sync Now uploads whatever it holds, so disconnect Trakt there if it's only test data.
 
 Then:
 
@@ -170,12 +181,12 @@ The version number lives only in `package.json`. The app and server both read it
 ## Project layout
 
 ```
-server/         index.ts (server), api.ts (library), auth.ts (sign-in),
-                trakt.ts (Trakt sync), tmdb.ts, db.ts (SQLite)
+server/         index.ts (server), api.ts (library), auth.ts (sign-in), settings.ts,
+                trakt.ts (two-way Trakt sync), notify.ts (notifications), tmdb.ts, db.ts (SQLite)
 src/
-  components/   Poster, TabBar, DetailSheet, EpisodeTracker, Carousel3D, UserMenu, ...
-  screens/      Watchlist, Upcoming, Discover, Watched, Login
-  lib/          api.ts, auth.ts, trakt.ts, tmdb.ts, library.ts, episodes.ts, showinfo.ts, status.ts
+  components/   Poster, TabBar, DetailSheet, EpisodeTracker, Carousel3D, UserMenu, SettingsSheet, ...
+  screens/      Watchlist, Upcoming, Discover, Watched, Login, Setup
+  lib/          api.ts, auth.ts, trakt.ts, tmdb.ts, library.ts, settings.ts, freshness.ts, ...
 public/         app icons
 docs/           install guide
 data/           screengrave.db (created on first run, local development)
@@ -187,6 +198,31 @@ Dockerfile, docker-compose.yml, .env.example
 ## Changelog
 
 <details open>
+<summary><strong>0.7.0 (Day 6)</strong></summary>
+
+Includes 0.6: ScreenGrave now runs on a home server over HTTPS behind a reverse proxy with a wildcard Let's Encrypt certificate.
+
+**New**
+- **Settings** screen: display name, sign-in, Trakt, notifications, region, and About.
+- **First-run setup:** choose a PIN (recommended), a password, or no sign-in. Change it any time in Settings. `APP_PASSWORD` in `.env` is now optional and `APP_USERNAME` is no longer needed.
+- **Two-way Trakt sync:** watchlist changes, watched movies, and checked-off episodes are sent to Trakt, removals included. Can be turned off in Settings.
+- One-time upload of anything Trakt was missing, with no duplicate plays.
+- **Notifications** for new episodes and releases: Discord, ntfy, Gotify, Telegram, or a webhook, once a day at the hour you choose.
+- **Region** setting for release dates and streaming services (defaults to the US).
+
+**Fixes**
+- Sync no longer brings back titles you removed in ScreenGrave.
+- Smart Watchlist moves are no longer treated as your own changes.
+- Movie release dates now use your country's theatrical date.
+- iPhone: page content no longer shows behind the status bar, and the tab bar stays put on short pages.
+- Floating search and scroll-up buttons respond to the first tap.
+- Watched: the scroll-up button now appears after the fourth row of posters.
+- Discover: the scroll-up button lands on the browse filters in one tap.
+- Installed apps no longer get stuck on an old version after an update.
+
+</details>
+
+<details>
 <summary><strong>0.5.0 (Day 5)</strong></summary>
 
 **New**

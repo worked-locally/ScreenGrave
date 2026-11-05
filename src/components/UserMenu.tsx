@@ -16,6 +16,7 @@ type View = 'menu' | 'about' | 'note' | 'busy' | 'connect'
 interface Props {
   username: string
   canLogout: boolean
+  onOpenSettings: () => void
 }
 
 function Row({
@@ -51,7 +52,7 @@ function ago(ms: number) {
   return `${Math.round(h / 24)} d ago`
 }
 
-export default function UserMenu({ username, canLogout }: Props) {
+export default function UserMenu({ username, canLogout, onOpenSettings }: Props) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('menu')
   const [note, setNote] = useState('')
@@ -85,11 +86,14 @@ export default function UserMenu({ username, canLogout }: Props) {
     try {
       const r = await traktSync()
       const changed = r.titles > 0 || r.episodes > 0
+      const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+      const parts: string[] = []
+      if (changed) parts.push(`added ${plural(r.titles, 'title')} and ${plural(r.episodes, 'episode')} from Trakt`)
+      if (r.uploaded) parts.push(`uploaded ${plural(r.uploaded, 'item')} Trakt was missing`)
+      if (r.sent && !r.uploaded) parts.push(`sent ${plural(r.sent, 'change')} to Trakt`)
       setNote(
-        changed
-          ? `Synced with Trakt: added ${r.titles} ${r.titles === 1 ? 'title' : 'titles'} and ${r.episodes} ${
-              r.episodes === 1 ? 'episode' : 'episodes'
-            }. Refreshing…`
+        parts.length
+          ? `Synced: ${parts.join(', ')}.${changed ? ' Refreshing…' : ''}`
           : 'Synced with Trakt. Everything was already up to date.',
       )
       setView('note')
@@ -252,7 +256,13 @@ export default function UserMenu({ username, canLogout }: Props) {
                     }}
                   />
                 )}
-                <Row label="Settings" onClick={() => go('note', 'Settings are coming soon.')} />
+                <Row
+                  label="Settings"
+                  onClick={() => {
+                    setOpen(false)
+                    onOpenSettings()
+                  }}
+                />
                 <Row label="About" onClick={() => go('about')} />
                 {trakt?.connected && <Row label="Disconnect Trakt" onClick={() => void disconnect()} />}
                 {canLogout && (

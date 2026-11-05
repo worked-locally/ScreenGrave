@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { Hono, type Context } from 'hono'
 import { db } from './db'
+import { onPrefsChange, prefs } from './settings'
 import { fetchTitle, type Title } from './tmdb'
 import { VERSION } from './version'
 
@@ -102,6 +103,22 @@ async function accessToken(): Promise<string> {
   }
 }
 
+async function traktPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'trakt-api-version': '2',
+      'trakt-api-key': CLIENT_ID,
+      authorization: `Bearer ${await accessToken()}`,
+      'user-agent': UA,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`Trakt ${res.status} on POST ${path}`)
+  return res.json() as Promise<T>
+}
+
 async function traktGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
@@ -159,6 +176,9 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
 }
 
 async function runSync() {
+  // send your queued changes first, so what comes back from Trakt already includes them
+  await flushOutbox()
+
   const [shows, movies, wlShows, wlMovies] = await Promise.all([
     traktGet<WatchedShow[]>('/sync/watched/shows'),
     traktGet<WatchedMovie[]>('/sync/watched/movies'),
@@ -245,8 +265,178 @@ async function runSync() {
   }
 
   writeSetting('trakt_show_seen', lastSeen)
+
+  // two-way: on the first run, upload what Trakt is missing; then send anything queued
+  let uploaded = 0
+  if (prefs().twoWaySync && !readSetting<number>('trakt_backfill_done')) uploaded = await backfill(shows, movies)
+  const sent = await flushOutbox()
+
   writeSetting('trakt_last_sync', Date.now())
-  return { titles, episodes, skipped }
+  return { titles, episodes, skipped, uploaded, sent }
+}
+
+// ----- two-way sync: send your changes to Trakt -----
+// Changes are queued in the outbox and sent a few seconds later in small batches.
+// If Trakt can't be reached they stay queued and are retried, so nothing is lost.
+
+export type PushAction = 'watchlist_add' | 'watchlist_remove' | 'history_add' | 'history_remove'
+export interface PushItem {
+  type: 'movie' | 'tv'
+  id: number // TMDB id
+  season?: number
+  episode?: number
+}
+
+const upsertOutbox = db.prepare(
+  `INSERT INTO outbox (item, action, payload, created_at) VALUES (?, ?, ?, ?)
+   ON CONFLICT(item) DO UPDATE SET action = excluded.action, payload = excluded.payload, created_at = excluded.created_at`,
+)
+const allOutbox = db.prepare('SELECT item, action, payload FROM outbox ORDER BY created_at')
+const deleteOutbox = db.prepare('DELETE FROM outbox WHERE item = ?')
+
+const connected = () => !!CLIENT_ID && !!readSetting<Tokens>('trakt_tokens')
+const pushing = () => connected() && prefs().twoWaySync
+
+// turning two-way sync off drops anything still waiting to be sent
+onPrefsChange((next, prev) => {
+  if (prev.twoWaySync && !next.twoWaySync) db.exec('DELETE FROM outbox')
+})
+
+function itemKey(action: PushAction, i: PushItem) {
+  const scope = action.startsWith('watchlist') ? 'wl' : 'hist'
+  return i.season !== undefined ? `${scope}:${i.type}-${i.id}:${i.season}-${i.episode}` : `${scope}:${i.type}-${i.id}`
+}
+
+let flushTimer: NodeJS.Timeout | undefined
+
+export function queuePush(action: PushAction, items: PushItem[]) {
+  if (!pushing() || items.length === 0) return
+  const now = Date.now()
+  db.exec('BEGIN')
+  try {
+    for (const i of items) upsertOutbox.run(itemKey(action, i), action, JSON.stringify(i), now)
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+  scheduleFlush(3000)
+}
+
+function scheduleFlush(ms: number) {
+  clearTimeout(flushTimer)
+  flushTimer = setTimeout(() => void flushOutbox(), ms)
+}
+
+// Trakt's body shape: movies by id, shows by id, episodes grouped as show → seasons → episodes
+function buildBody(items: PushItem[]) {
+  const movies: { ids: { tmdb: number } }[] = []
+  const shows = new Map<number, Map<number, number[]>>()
+  const wholeShows: { ids: { tmdb: number } }[] = []
+  for (const i of items) {
+    if (i.type === 'movie') movies.push({ ids: { tmdb: i.id } })
+    else if (i.season === undefined) wholeShows.push({ ids: { tmdb: i.id } })
+    else {
+      const seasons = shows.get(i.id) ?? new Map<number, number[]>()
+      seasons.set(i.season, [...(seasons.get(i.season) ?? []), i.episode!])
+      shows.set(i.id, seasons)
+    }
+  }
+  return {
+    movies,
+    shows: [
+      ...wholeShows,
+      ...[...shows.entries()].map(([id, seasons]) => ({
+        ids: { tmdb: id },
+        seasons: [...seasons.entries()].map(([number, eps]) => ({ number, episodes: eps.map((n) => ({ number: n })) })),
+      })),
+    ],
+  }
+}
+
+const ENDPOINT: Record<PushAction, string> = {
+  watchlist_add: '/sync/watchlist',
+  watchlist_remove: '/sync/watchlist/remove',
+  history_add: '/sync/history',
+  history_remove: '/sync/history/remove',
+}
+
+let flushing = false
+
+export async function flushOutbox(): Promise<number> {
+  if (flushing || !pushing()) return 0
+  flushing = true
+  let sent = 0
+  try {
+    const rows = allOutbox.all() as unknown as { item: string; action: PushAction; payload: string }[]
+    for (const action of Object.keys(ENDPOINT) as PushAction[]) {
+      const batch = rows.filter((r) => r.action === action)
+      // Trakt asks apps to keep requests modest, so send big uploads in chunks
+      for (let i = 0; i < batch.length; i += 200) {
+        const chunk = batch.slice(i, i + 200)
+        await traktPost(ENDPOINT[action], buildBody(chunk.map((r) => JSON.parse(r.payload) as PushItem)))
+        for (const r of chunk) deleteOutbox.run(r.item)
+        sent += chunk.length
+        await new Promise((r) => setTimeout(r, 1100)) // about one write per second
+      }
+    }
+    if (sent) console.log(`[screengrave] sent ${sent} change(s) to Trakt`)
+  } catch (e) {
+    console.error('[screengrave] sending changes to Trakt failed, will retry:', e)
+    scheduleFlush(60_000)
+  } finally {
+    flushing = false
+  }
+  return sent
+}
+
+// One-time upload of everything ScreenGrave has that Trakt doesn't, the first time two-way sync runs.
+// Watched movies and episodes already on Trakt are skipped, so no duplicate plays are created.
+const libraryRows = db.prepare('SELECT key, list FROM library')
+const episodeRows = db.prepare('SELECT show, ep FROM episodes')
+
+async function backfill(shows: WatchedShow[], movies: WatchedMovie[]) {
+  const onTraktMovies = new Set(movies.map((m) => m.movie?.ids?.tmdb).filter(Boolean))
+  const traktIdOf = new Map<number, number>()
+  for (const s of shows) if (s.show?.ids?.tmdb && s.show.ids.trakt) traktIdOf.set(s.show.ids.tmdb, s.show.ids.trakt)
+
+  const local = new Map<number, string[]>()
+  for (const r of episodeRows.all() as unknown as { show: string; ep: string }[]) {
+    const id = Number(r.show.slice(3))
+    local.set(id, [...(local.get(id) ?? []), r.ep])
+  }
+
+  const watchlist: PushItem[] = []
+  const history: PushItem[] = []
+  for (const r of libraryRows.all() as unknown as { key: string; list: string }[]) {
+    const [type, id] = r.key.split('-') as ['movie' | 'tv', string]
+    if (r.list === 'watchlist') {
+      // shows you've started already live under Trakt's progress, so don't also add them to its watchlist
+      if (type === 'tv' && local.has(Number(id))) continue
+      watchlist.push({ type, id: Number(id) })
+    } else if (type === 'movie' && !onTraktMovies.has(Number(id))) history.push({ type, id: Number(id) })
+  }
+  await pool([...local.entries()], 4, async ([id, eps]) => {
+    let done = new Set<string>()
+    const traktId = traktIdOf.get(id)
+    if (traktId) {
+      const p = await traktGet<Progress>(`/shows/${traktId}/progress/watched`).catch(() => null)
+      if (!p) return // can't compare right now; skip rather than risk duplicates
+      done = new Set(
+        (p.seasons ?? []).flatMap((s) => (s.episodes ?? []).filter((e) => e.completed).map((e) => `${s.number}-${e.number}`)),
+      )
+    }
+    for (const ep of eps) {
+      if (done.has(ep)) continue
+      const [season, episode] = ep.split('-').map(Number)
+      history.push({ type: 'tv', id, season, episode })
+    }
+  })
+
+  queuePush('watchlist_add', watchlist)
+  queuePush('history_add', history)
+  writeSetting('trakt_backfill_done', Date.now())
+  return watchlist.length + history.length
 }
 
 // ----- routes -----
@@ -261,6 +451,7 @@ trakt.get('/status', (c) =>
     configured: !!CLIENT_ID,
     connected: !!readSetting<Tokens>('trakt_tokens'),
     lastSync: readSetting<number>('trakt_last_sync'),
+    pending: (db.prepare('SELECT COUNT(*) AS n FROM outbox').get() as unknown as { n: number }).n,
     redirectUri: redirectFor(c),
   }),
 )
@@ -393,5 +584,7 @@ trakt.post('/sync', async (c) => {
 
 trakt.post('/disconnect', (c) => {
   delSetting.run('trakt_tokens')
+  delSetting.run('trakt_backfill_done') // reconnecting uploads anything Trakt is missing again
+  db.exec('DELETE FROM outbox')
   return c.json({ ok: true })
 })

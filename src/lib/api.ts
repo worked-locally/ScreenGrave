@@ -17,8 +17,8 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   library: () => call<Library>('/library'),
-  putEntry: (key: string, entry: Library[string]) =>
-    call(`/library/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify(entry) }),
+  putEntry: (key: string, entry: Library[string], auto = false) =>
+    call(`/library/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify({ ...entry, auto }) }),
   deleteEntry: (key: string) => call(`/library/${encodeURIComponent(key)}`, { method: 'DELETE' }),
   episodes: () => call<EpisodeMap>('/episodes'),
   changeEpisodes: (show: string, add: string[], remove: string[]) =>

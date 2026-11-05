@@ -34,6 +34,20 @@ db.exec(`
     removed_at INTEGER NOT NULL
   );
 
+  -- changes waiting to be sent to Trakt (one row per item; the latest change wins)
+  CREATE TABLE IF NOT EXISTS outbox (
+    item       TEXT PRIMARY KEY,
+    action     TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  -- releases you've already been notified about, so nothing is sent twice
+  CREATE TABLE IF NOT EXISTS notified (
+    key     TEXT PRIMARY KEY,
+    sent_at INTEGER NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import DetailSheet from './components/DetailSheet'
+import SettingsSheet from './components/SettingsSheet'
 import TabBar, { type Tab } from './components/TabBar'
 import TapEffects from './components/TapEffects'
 import UserMenu from './components/UserMenu'
 import { getSession, type Session } from './lib/auth'
 import { useEpisodes } from './lib/episodes'
 import { keyOf, useLibrary } from './lib/library'
+import { getPrefs, type Prefs } from './lib/settings'
 import { useShowInfo } from './lib/showinfo'
 import { StatusContext } from './lib/status'
-import { seasonEpisodes, showSeasons, type Title } from './lib/tmdb'
+import { seasonEpisodes, setRegion, showSeasons, type Title } from './lib/tmdb'
 import Discover from './screens/Discover'
 import Login from './screens/Login'
+import Setup from './screens/Setup'
 import Upcoming from './screens/Upcoming'
 import Watched from './screens/Watched'
 import Watchlist from './screens/Watchlist'
@@ -55,8 +58,25 @@ export default function App() {
 
   if (down) return <ServerDown />
   if (!session) return <Splash text="Loading…" />
+  if (session.setupRequired) {
+    return (
+      <Setup
+        onDone={() =>
+          getSession()
+            .then(setSession)
+            .catch(() => setDown(true))
+        }
+      />
+    )
+  }
   if (session.authRequired && !session.authenticated) {
-    return <Login username={session.username} onSuccess={() => setSession({ ...session, authenticated: true })} />
+    return (
+      <Login
+        username={session.username}
+        method={session.method}
+        onSuccess={() => setSession({ ...session, authenticated: true })}
+      />
+    )
   }
   return <Shell session={session} />
 }
@@ -64,7 +84,20 @@ export default function App() {
 function Shell({ session }: { session: Session }) {
   const [tab, setTab] = useState<Tab>('watchlist')
   const [selected, setSelected] = useState<Title | null>(null)
+  const [prefs, setPrefs] = useState<Prefs | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const { library, ready, error, setList, remove } = useLibrary()
+
+  // your Settings (region, display name, two-way sync) are loaded before the screens
+  useEffect(() => {
+    getPrefs()
+      .then((p) => {
+        setRegion(p.region)
+        setPrefs(p)
+      })
+      .catch(() => setPrefs({ displayName: '', region: 'US', twoWaySync: true }))
+  }, [])
+  const username = prefs?.displayName || session.username
   const ep = useEpisodes()
 
   // everything on the Watchlist, plus Watched shows (they may still get new episodes)
@@ -98,12 +131,12 @@ function Shell({ session }: { session: Session }) {
       if (e.list === 'watchlist' && seen >= i.aired) {
         // you put it back yourself (a rewatch) and nothing new has aired since, so leave it
         if (rec?.to === 'watched' && rec.aired === i.aired && (e.addedAt ?? 0) > rec.at) continue
-        setList(t, 'watched')
+        setList(t, 'watched', true)
         records[key] = { to: 'watched', aired: i.aired, at: Date.now() }
         changed = true
       } else if (e.list === 'watched' && !i.ended && seen > 0 && seen < i.aired) {
         // new episodes came out for a show you were caught up on
-        setList(t, 'watchlist')
+        setList(t, 'watchlist', true)
         records[key] = { to: 'watchlist', aired: i.aired, at: Date.now() }
         changed = true
       }
@@ -137,7 +170,7 @@ function Shell({ session }: { session: Session }) {
   }
 
   if (error) return <ServerDown />
-  if (!ready) return <Splash text="Loading your library…" />
+  if (!ready || !prefs) return <Splash text="Loading your library…" />
 
   return (
     <StatusContext.Provider value={{ library, info, count: ep.count }}>
@@ -150,7 +183,7 @@ function Shell({ session }: { session: Session }) {
       >
         <div className="status-cover" aria-hidden="true" />
         <TapEffects />
-        <UserMenu username={session.username} canLogout={session.authRequired} />
+        <UserMenu username={username} canLogout={session.authRequired} onOpenSettings={() => setSettingsOpen(true)} />
 
         <div key={tab} className="anim-fade">
           {tab === 'watchlist' && <Watchlist library={library} info={info} ep={ep} onSelect={setSelected} />}
@@ -172,6 +205,17 @@ function Shell({ session }: { session: Session }) {
             }}
             onRemove={() => remove(selected)}
             ep={ep}
+          />
+        )}
+
+        {settingsOpen && (
+          <SettingsSheet
+            prefs={prefs}
+            username={session.username}
+            passwordSource={session.passwordSource}
+            method={session.method}
+            onChange={setPrefs}
+            onClose={() => setSettingsOpen(false)}
           />
         )}
       </div>

@@ -201,7 +201,11 @@ export interface Filter {
   provider: number | null
 }
 
-const REGION = 'US'
+// your region (from Settings) for release dates and streaming services
+let REGION = 'US'
+export const setRegion = (code: string) => {
+  REGION = code
+}
 
 // the services shown first, in this order (matched by name against TMDB's live list)
 const POPULAR_SERVICES: RegExp[] = [

@@ -1,6 +1,11 @@
+export type Method = 'pin' | 'password' | 'none'
+
 export interface Session {
   authRequired: boolean
   authenticated: boolean
+  setupRequired: boolean // first run: nothing chosen yet
+  method: Method // how you sign in
+  passwordSource: 'env' | 'app' | 'off' // where that's set
   username: string
 }
 
@@ -27,6 +32,28 @@ export async function login(password: string): Promise<LoginResult> {
     return 'error'
   }
 }
+
+async function post(path: string, body: unknown): Promise<string | null> {
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (res.ok) return null
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    return data.error ?? `Something went wrong (${res.status}).`
+  } catch {
+    return "Couldn't reach the server."
+  }
+}
+
+// returns null when it worked, otherwise a message to show
+export const setupAccount = (displayName: string, method: Method, secret: string) =>
+  post('/api/auth/setup', { displayName, method, secret })
+
+export const changeMethod = (current: string, method: Method, secret: string) =>
+  post('/api/auth/method', { current, method, secret })
 
 export async function logout() {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})

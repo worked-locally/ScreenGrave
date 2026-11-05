@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import FloatingSearch from '../components/FloatingSearch'
 import Poster from '../components/Poster'
 import ScreenTitle from '../components/ScreenTitle'
@@ -27,6 +27,19 @@ export default function Watched({ library, onSelect }: Props) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('year-desc')
   const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // the up arrow appears once the fourth row of posters has scrolled off the top
+  const pastFourthRow = useCallback(() => {
+    const posters = Array.from(listRef.current?.querySelectorAll<HTMLElement>('[data-poster]') ?? [])
+    const rows = [...new Set(posters.map((p) => Math.round(p.getBoundingClientRect().top + window.scrollY)))].sort(
+      (a, b) => a - b,
+    )
+    if (rows.length < 4) return Infinity // short list: no arrow needed
+    const height = posters[0].getBoundingClientRect().height
+    return rows[3] + height
+  }, [])
+  const toTop = useCallback(() => window.scrollTo({ top: 0, behavior: 'smooth' }), [])
 
   const all = Object.values(library).filter((e) => e.list === 'watched')
   const q = query.trim().toLowerCase()
@@ -110,6 +123,7 @@ export default function Watched({ library, onSelect }: Props) {
         <p className="mt-16 text-center text-sm text-[#8b8392]">No matches for “{query.trim()}”.</p>
       )}
 
+      <div ref={listRef}>
       {groups.map((g) => (
         <section key={g.label || 'all'} className="mb-4">
           {g.label && (
@@ -124,6 +138,7 @@ export default function Watched({ library, onSelect }: Props) {
             {g.items.map((t) => (
               <button
                 key={keyOf(t)}
+                data-poster
                 onClick={() => onSelect(t)}
                 className="text-left transition-transform active:scale-95"
               >
@@ -133,8 +148,9 @@ export default function Watched({ library, onSelect }: Props) {
           </div>
         </section>
       ))}
+      </div>
 
-      <FloatingSearch target={inputRef} onUp={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+      <FloatingSearch target={inputRef} onUp={toTop} upAfter={pastFourthRow} />
     </div>
   )
 }

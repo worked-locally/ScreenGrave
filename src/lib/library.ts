@@ -29,11 +29,12 @@ export function useLibrary() {
     }
   }, [])
 
-  const setList = useCallback((t: Title, list: ListName) => {
+  // auto = moved by the smart Watchlist rather than by you (those moves aren't sent to Trakt)
+  const setList = useCallback((t: Title, list: ListName, auto = false) => {
     setLibrary((l) => {
       const prev = l[keyOf(t)]
       const entry: Entry = { title: t, list, addedAt: prev && prev.list === list ? prev.addedAt : Date.now() }
-      api.putEntry(keyOf(t), entry).catch(reportSaveError)
+      api.putEntry(keyOf(t), entry, auto).catch(reportSaveError)
       return { ...l, [keyOf(t)]: entry }
     })
   }, [])

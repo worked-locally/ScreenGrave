@@ -3,9 +3,10 @@ import { useEffect, useState, type MouseEvent, type PointerEvent as ReactPointer
 interface Props {
   target: RefObject<HTMLInputElement | null>
   onUp?: () => void // when given, a scroll-up button appears at the bottom of the page
+  upAfter?: () => number // ...or once you've scrolled past this point (page pixels)
 }
 
-export default function FloatingSearch({ target, onUp }: Props) {
+export default function FloatingSearch({ target, onUp, upAfter }: Props) {
   const [searchVisible, setSearchVisible] = useState(true)
   const [atBottom, setAtBottom] = useState(false)
 
@@ -21,7 +22,8 @@ export default function FloatingSearch({ target, onUp }: Props) {
   useEffect(() => {
     const check = () => {
       const doc = document.documentElement
-      setAtBottom(window.scrollY > 400 && window.innerHeight + window.scrollY >= doc.scrollHeight - 200)
+      if (upAfter) setAtBottom(window.scrollY > upAfter())
+      else setAtBottom(window.scrollY > 400 && window.innerHeight + window.scrollY >= doc.scrollHeight - 200)
     }
     check()
     window.addEventListener('scroll', check, { passive: true })
@@ -33,7 +35,7 @@ export default function FloatingSearch({ target, onUp }: Props) {
       window.removeEventListener('resize', check)
       ro.disconnect()
     }
-  }, [])
+  }, [upAfter])
 
   const showUp = !!onUp && atBottom
   const showSearch = !searchVisible

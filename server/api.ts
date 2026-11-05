@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { db } from './db'
+import { queuePush, type PushItem } from './trakt'
 
 const KEY = /^(tv|movie)-\d+$/
 const SHOW = /^tv-\d+$/
@@ -10,7 +11,20 @@ interface Entry {
   title?: unknown
   list?: string
   addedAt?: number
+  auto?: boolean // moved by the smart Watchlist, not by you: never sent to Trakt
 }
+
+const findList = db.prepare('SELECT list FROM library WHERE key = ?')
+
+function itemOf(key: string): PushItem {
+  const [type, id] = key.split('-') as ['movie' | 'tv', string]
+  return { type, id: Number(id) }
+}
+const episodeItems = (show: string, eps: string[]): PushItem[] =>
+  eps.map((ep) => {
+    const [season, episode] = ep.split('-').map(Number)
+    return { type: 'tv', id: Number(show.slice(3)), season, episode }
+  })
 
 interface LibraryRow {
   key: string
@@ -76,16 +90,32 @@ api.put('/library/:key', async (c) => {
   const key = c.req.param('key')
   const body = (await c.req.json().catch(() => null)) as Entry | null
   if (!validEntry(key, body)) return c.json({ error: 'invalid entry' }, 400)
+  const prev = (findList.get(key) as unknown as { list: string } | undefined)?.list
   upsertEntry.run(key, JSON.stringify(body.title), body.list!, body.addedAt ?? Date.now())
   clearRemoved.run(key) // you added it back yourself
+
+  if (!body.auto && prev !== body.list) {
+    const item = itemOf(key)
+    if (body.list === 'watchlist') queuePush('watchlist_add', [item])
+    else {
+      queuePush('watchlist_remove', [item])
+      // a movie counts as one watch; a show's watches are its episodes (sent separately)
+      if (item.type === 'movie') queuePush('history_add', [item])
+    }
+  }
   return c.json({ ok: true })
 })
 
 api.delete('/library/:key', (c) => {
   const key = c.req.param('key')
   if (!KEY.test(key)) return c.json({ error: 'invalid key' }, 400)
+  const prev = (findList.get(key) as unknown as { list: string } | undefined)?.list
   deleteEntry.run(key)
   markRemoved.run(key, Date.now())
+
+  const item = itemOf(key)
+  if (prev === 'watchlist') queuePush('watchlist_remove', [item])
+  else if (prev === 'watched' && item.type === 'movie') queuePush('history_remove', [item])
   return c.json({ ok: true })
 })
 
@@ -103,10 +133,14 @@ api.post('/episodes', async (c) => {
   const body = (await c.req.json().catch(() => null)) as { show?: string; add?: unknown; remove?: unknown } | null
   if (!body?.show || !SHOW.test(body.show)) return c.json({ error: 'invalid show' }, 400)
   const show = body.show
+  const add = cleanEps(body.add)
+  const remove = cleanEps(body.remove)
   transaction(() => {
-    for (const ep of cleanEps(body.add)) addEpisode.run(show, ep)
-    for (const ep of cleanEps(body.remove)) removeEpisode.run(show, ep)
+    for (const ep of add) addEpisode.run(show, ep)
+    for (const ep of remove) removeEpisode.run(show, ep)
   })
+  queuePush('history_add', episodeItems(show, add))
+  queuePush('history_remove', episodeItems(show, remove))
   return c.json({ ok: true })
 })
 
@@ -122,6 +156,7 @@ api.post('/import', async (c) => {
 
   let titles = 0
   let eps = 0
+  const newEps: PushItem[] = []
   transaction(() => {
     for (const [key, e] of Object.entries(body.library ?? {})) {
       if (!validEntry(key, e)) continue
@@ -131,10 +166,12 @@ api.post('/import', async (c) => {
     for (const [show, list] of Object.entries(body.episodes ?? {})) {
       if (!SHOW.test(show)) continue
       for (const ep of cleanEps(list)) {
-        addEpisode.run(show, ep)
+        // only episodes that weren't already checked off get sent to Trakt
+        if (Number(addEpisode.run(show, ep).changes)) newEps.push(...episodeItems(show, [ep]))
         eps++
       }
     }
   })
+  queuePush('history_add', newEps)
   return c.json({ ok: true, titles, episodes: eps })
 })

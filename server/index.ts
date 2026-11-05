@@ -4,15 +4,18 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { existsSync } from 'node:fs'
 import { api } from './api'
-import { auth, AUTH_REQUIRED, requireAuth } from './auth'
+import { auth, PASSWORD_SOURCE, requireAuth } from './auth'
 import { db } from './db'
 import { TMDB_TOKEN } from './tmdb'
+import { notify, startScheduler } from './notify'
+import { settings } from './settings'
 import { trakt } from './trakt'
 import { VERSION } from './version'
 
 const PORT = Number(process.env.PORT ?? 8787)
 if (!TMDB_TOKEN) console.warn('[screengrave] TMDB_TOKEN is not set, so TMDB requests will fail.')
-if (!AUTH_REQUIRED) console.warn('[screengrave] APP_PASSWORD is not set, so login is turned off.')
+if (PASSWORD_SOURCE === 'off') console.warn('[screengrave] AUTH_DISABLED is set, so sign-in is turned off.')
+if (PASSWORD_SOURCE === 'app') console.log('[screengrave] sign-in is managed in the app (first run lets you pick a PIN, a password, or none).')
 
 const app = new Hono()
 
@@ -23,6 +26,8 @@ app.get('/api/health', (c) => c.json({ ok: true, version: VERSION }))
 
 app.route('/api/auth', auth)
 app.route('/api/trakt', trakt)
+app.route('/api/settings', settings)
+app.route('/api/notify', notify)
 
 // TMDB proxy: the browser calls /api/tmdb/..., and the server adds the token
 app.get('/api/tmdb/*', async (c) => {
@@ -54,6 +59,8 @@ if (existsSync('dist')) {
   app.use('/*', serveStatic({ root: './dist' }))
   app.get('*', serveStatic({ path: './dist/index.html' }))
 }
+
+startScheduler()
 
 const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`[screengrave] v${VERSION} running on http://localhost:${info.port}`)

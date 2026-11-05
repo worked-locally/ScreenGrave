@@ -140,6 +140,8 @@ interface Progress {
 }
 
 const hasKey = db.prepare('SELECT 1 FROM library WHERE key = ?')
+const removedAt = db.prepare('SELECT removed_at FROM removed WHERE key = ?')
+const clearRemoved = db.prepare('DELETE FROM removed WHERE key = ?')
 const insertEntry = db.prepare('INSERT OR IGNORE INTO library (key, title, list, added_at) VALUES (?, ?, ?, ?)')
 const addEpisode = db.prepare('INSERT OR IGNORE INTO episodes (show, ep) VALUES (?, ?)')
 
@@ -183,8 +185,13 @@ async function runSync() {
   for (const s of shows) want('tv', s.show?.ids?.tmdb, 'watchlist', s.last_watched_at) // in progress = watchlist
   for (const w of wlShows) want('tv', w.show?.ids?.tmdb, 'watchlist', w.listed_at)
 
-  // only look up titles you don't already have
-  const missing = [...wanted.entries()].filter(([key]) => !hasKey.get(key))
+  // only look up titles you don't already have, and skip ones you removed here,
+  // unless you've watched or listed them on Trakt again since then
+  const missing = [...wanted.entries()].filter(([key, w]) => {
+    if (hasKey.get(key)) return false
+    const row = removedAt.get(key) as unknown as { removed_at: number } | undefined
+    return !row || w.at > row.removed_at
+  })
   const found = await pool(missing, 6, async ([key, w]) => ({
     key,
     w,
@@ -217,6 +224,7 @@ async function runSync() {
         continue
       }
       titles += Number(insertEntry.run(f.key, JSON.stringify(f.title), f.w.list, f.w.at).changes)
+      clearRemoved.run(f.key)
     }
     for (const { s, p } of progress) {
       if (!p) continue

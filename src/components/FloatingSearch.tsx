@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react'
+import { useEffect, useState, type MouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 
 interface Props {
   target: RefObject<HTMLInputElement | null>
@@ -39,6 +39,23 @@ export default function FloatingSearch({ target, onUp }: Props) {
   const showSearch = !searchVisible
   if (!showUp && !showSearch) return null
 
+  // On touch screens, act on the first touch: a tap during scrolling otherwise only stops the scroll,
+  // so the button seemed to need several taps. Mouse and keyboard still use a normal click.
+  const tap = (fn: () => void) => ({
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (e.pointerType === 'mouse') return
+      e.currentTarget.dataset.handled = '1'
+      fn()
+    },
+    onClick: (e: MouseEvent<HTMLButtonElement>) => {
+      if (e.currentTarget.dataset.handled) {
+        delete e.currentTarget.dataset.handled
+        return
+      }
+      fn()
+    },
+  })
+
   function focusSearch() {
     target.current?.focus({ preventScroll: true })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -52,7 +69,7 @@ export default function FloatingSearch({ target, onUp }: Props) {
       <div className="mx-auto flex max-w-xl justify-end gap-3 px-4">
         {showUp && (
           <button
-            onClick={onUp}
+            {...tap(onUp!)}
             aria-label="Scroll up"
             className="anim-fade pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#1f1a24]/95 text-[#efe9df] shadow-lg shadow-black/50 backdrop-blur transition-transform active:scale-90"
           >
@@ -63,7 +80,7 @@ export default function FloatingSearch({ target, onUp }: Props) {
         )}
         {showSearch && (
           <button
-            onClick={focusSearch}
+            {...tap(focusSearch)}
             aria-label="Search"
             className="anim-fade pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg shadow-black/50 transition-transform active:scale-90"
             style={{ background: 'var(--accent)', color: '#1a1008' }}

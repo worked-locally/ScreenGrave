@@ -148,6 +148,7 @@ function Shell({ session }: { session: Session }) {
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 6.5rem)',
         }}
       >
+        <div className="status-cover" aria-hidden="true" />
         <TapEffects />
         <UserMenu username={session.username} canLogout={session.authRequired} />
 

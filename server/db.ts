@@ -28,6 +28,12 @@ db.exec(`
     expires_at INTEGER NOT NULL
   );
 
+  -- titles you removed, so a Trakt sync doesn't bring them back
+  CREATE TABLE IF NOT EXISTS removed (
+    key        TEXT PRIMARY KEY,
+    removed_at INTEGER NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

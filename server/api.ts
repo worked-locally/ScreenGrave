@@ -36,6 +36,10 @@ const upsertEntry = db.prepare(`
 `)
 const insertEntryIfMissing = db.prepare('INSERT OR IGNORE INTO library (key, title, list, added_at) VALUES (?, ?, ?, ?)')
 const deleteEntry = db.prepare('DELETE FROM library WHERE key = ?')
+const markRemoved = db.prepare(
+  'INSERT INTO removed (key, removed_at) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET removed_at = excluded.removed_at',
+)
+const clearRemoved = db.prepare('DELETE FROM removed WHERE key = ?')
 const addEpisode = db.prepare('INSERT OR IGNORE INTO episodes (show, ep) VALUES (?, ?)')
 const removeEpisode = db.prepare('DELETE FROM episodes WHERE show = ? AND ep = ?')
 const allLibrary = db.prepare('SELECT key, title, list, added_at FROM library')
@@ -73,6 +77,7 @@ api.put('/library/:key', async (c) => {
   const body = (await c.req.json().catch(() => null)) as Entry | null
   if (!validEntry(key, body)) return c.json({ error: 'invalid entry' }, 400)
   upsertEntry.run(key, JSON.stringify(body.title), body.list!, body.addedAt ?? Date.now())
+  clearRemoved.run(key) // you added it back yourself
   return c.json({ ok: true })
 })
 
@@ -80,6 +85,7 @@ api.delete('/library/:key', (c) => {
   const key = c.req.param('key')
   if (!KEY.test(key)) return c.json({ error: 'invalid key' }, 400)
   deleteEntry.run(key)
+  markRemoved.run(key, Date.now())
   return c.json({ ok: true })
 })
 

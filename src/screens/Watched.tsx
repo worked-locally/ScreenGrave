@@ -134,7 +134,7 @@ export default function Watched({ library, onSelect }: Props) {
         </section>
       ))}
 
-      <FloatingSearch target={inputRef} />
+      <FloatingSearch target={inputRef} onUp={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
     </div>
   )
 }

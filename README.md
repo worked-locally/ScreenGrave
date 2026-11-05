@@ -75,20 +75,8 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 | Show more than one upcoming episode per show | Upcoming |
 | Loading skeletons and a sliding tab-bar indicator | Upcoming |
 | Celebration effect when you finish a season or show | Upcoming |
+| Notifications for new episodes and releases (Discord, ntfy, Gotify, Telegram, webhook) | Upcoming |
 | Prebuilt Docker images on GitHub (no local build needed) | Upcoming |
-| Google (Gmail) sign-in | Upcoming |
-| Multi-user accounts | Upcoming |
-
---- | --- |
-| Docker image and compose file | In development |
-| Self-hosting on a Linux server over HTTPS | In development |
-| Settings screen | Upcoming |
-| First-run setup (choose your password in the app) | Upcoming |
-| Onboarding: pick favorite genres, mark what you've watched, choose what you're watching | Upcoming |
-| **For You** tab on Discover with personal recommendations | Upcoming |
-| Show more than one upcoming episode per show | Upcoming |
-| Loading skeletons and a sliding tab-bar indicator | Upcoming |
-| Celebration effect when you finish a season or show | Upcoming |
 | Google (Gmail) sign-in | Upcoming |
 | Multi-user accounts | Upcoming |
 

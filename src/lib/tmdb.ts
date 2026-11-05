@@ -121,10 +121,23 @@ interface RawEpisode {
   air_date?: string | null
 }
 
+// TMDB's main release_date is the earliest premiere anywhere; prefer the theatrical date in your region
+function regionalRelease(d: { release_dates?: { results?: { iso_3166_1: string; release_dates: { type: number; release_date: string }[] }[] } }): string {
+  const region = d.release_dates?.results?.find((r) => r.iso_3166_1 === REGION)
+  if (!region) return ''
+  const pick = (types: number[]) =>
+    region.release_dates
+      .filter((r) => types.includes(r.type) && r.release_date)
+      .map((r) => r.release_date.slice(0, 10))
+      .sort()[0] ?? ''
+  // 3 = theatrical, 2 = limited theatrical, 4 = digital (for streaming-only films)
+  return pick([3]) || pick([2]) || pick([4])
+}
+
 export async function fetchInfo(t: Title): Promise<Info> {
   if (t.type === 'movie') {
-    const d = await get(`/movie/${t.id}`)
-    const date = (d.release_date as string) || ''
+    const d = await get(`/movie/${t.id}`, { append_to_response: 'release_dates' })
+    const date = regionalRelease(d) || (d.release_date as string) || ''
     return {
       aired: 0,
       ended: false,

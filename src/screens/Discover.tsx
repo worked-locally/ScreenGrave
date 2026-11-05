@@ -190,8 +190,9 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
   // back up to the divider, so the Movies / Series switch is still in reach
   function toBrowse() {
     const el = browseRef.current
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    else window.scrollTo({ top: 0, behavior: 'smooth' })
+    // leave room for the status bar on iPhone plus a little breathing space
+    const top = el ? el.getBoundingClientRect().top + window.scrollY - 72 : 0
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
   }
 
   const suggestions = q ? found.slice(0, 6) : []

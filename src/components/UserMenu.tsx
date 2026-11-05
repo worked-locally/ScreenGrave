@@ -87,7 +87,9 @@ export default function UserMenu({ username, canLogout }: Props) {
       const changed = r.titles > 0 || r.episodes > 0
       setNote(
         changed
-          ? `Synced with Trakt: added ${r.titles} titles and ${r.episodes} episodes. Refreshing…`
+          ? `Synced with Trakt: added ${r.titles} ${r.titles === 1 ? 'title' : 'titles'} and ${r.episodes} ${
+              r.episodes === 1 ? 'episode' : 'episodes'
+            }. Refreshing…`
           : 'Synced with Trakt. Everything was already up to date.',
       )
       setView('note')

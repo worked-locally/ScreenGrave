@@ -10,6 +10,25 @@ html, body, #root {
   height: 100%;
 }
 
+/* iPhone home-screen app: when a page is shorter than the screen, iOS leaves out the status-bar
+   height and the bottom tab bar floats up by that much. Making the page at least screen-tall
+   (status bar included) keeps it pinned to the bottom. */
+html {
+  min-height: calc(100% + env(safe-area-inset-top));
+}
+
+/* solid strip behind the iPhone status bar, so content scrolls under it cleanly */
+.status-cover {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top);
+  z-index: 9;
+  pointer-events: none;
+  background: rgba(12, 10, 15, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
 body {
   margin: 0;
   background: #0c0a0f;

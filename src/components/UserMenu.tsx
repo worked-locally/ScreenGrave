@@ -17,6 +17,7 @@ interface Props {
   username: string
   canLogout: boolean
   onOpenSettings: () => void
+  connectNow?: boolean // open straight to Trakt sign-in (from onboarding)
 }
 
 function Row({
@@ -52,7 +53,7 @@ function ago(ms: number) {
   return `${Math.round(h / 24)} d ago`
 }
 
-export default function UserMenu({ username, canLogout, onOpenSettings }: Props) {
+export default function UserMenu({ username, canLogout, onOpenSettings, connectNow }: Props) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('menu')
   const [note, setNote] = useState('')
@@ -109,6 +110,16 @@ export default function UserMenu({ username, canLogout, onOpenSettings }: Props)
   useEffect(() => {
     refreshTrakt()
   }, [])
+
+  // onboarding's "Import from Trakt instead"
+  useEffect(() => {
+    if (!connectNow) return
+    setOpen(true)
+    setShowRedirect(false)
+    setView('connect')
+    void startDevice()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectNow])
 
   // coming back from Trakt's sign-in page
   useEffect(() => {

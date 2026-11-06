@@ -78,7 +78,30 @@ The first time, ScreenGrave asks for your name and how you want to sign in:
 
 > Do this right after the first start: until it's chosen, whoever opens the app first gets to choose. You can change it later in **Settings**.
 
-On an iPhone, use **Share → Add to Home Screen** to install it like an app.
+### Add it to your iPhone home screen
+
+**If you open ScreenGrave with `https://`** (your own domain behind a reverse proxy):
+
+1. Open the address in **Safari**.
+2. Tap the **Share** button (on iOS 26, tap **⋯** next to the address bar first, then **Share**).
+3. Scroll down and tap **Add to Home Screen**.
+4. Leave **Open as Web App** on, then tap **Add**.
+
+It opens full screen like a regular app and keeps working offline.
+
+**If you open it with `http://`** (for example `http://192.168.1.50:8787` on your home network):
+
+An iPhone home-screen web app may show a blank page over plain HTTP. Add it as a bookmark instead, which opens in Safari and works fine:
+
+1. Open `http://<server-ip>:8787` in **Safari** and sign in.
+2. Tap the **Share** button (on iOS 26, tap **⋯** next to the address bar first, then **Share**).
+3. Scroll down and tap **Add to Home Screen**.
+4. Turn **Open as Web App** **off**.
+5. Tap **Add**.
+
+The icon opens ScreenGrave in a Safari tab, with Safari's address bar showing. Everything works except offline use. If you already added a version that shows a blank page, press and hold its icon, tap **Remove Bookmark** (or **Delete**), and add it again with these steps.
+
+> On iOS 18 or earlier there's no **Open as Web App** switch. If the icon shows a blank page there, save ScreenGrave to Safari's **Favorites** instead, or put it behind a reverse proxy with HTTPS.
 
 > Give the server a fixed IP (a DHCP reservation on your router) so the address doesn't change.
 

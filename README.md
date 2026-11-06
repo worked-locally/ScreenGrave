@@ -2,7 +2,7 @@
 
 > Track the shows and movies you love, in a clean, cinema-dark interface.
 
-**Version 0.7.0** · React + TypeScript · Node + SQLite · Docker · Installable PWA
+**Version 0.8.0** · React + TypeScript · Node + SQLite · Docker · Installable PWA
 
 ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is inspired by the clean look of Hobi and built as a calmer alternative to Trakt's busy interface. It runs on your own server in Docker, keeps your library in a small SQLite database, and can sync both ways with Trakt. Posters, trailers, genres, ratings, and episode data come from [TMDB](https://www.themoviedb.org/).
 
@@ -29,10 +29,17 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 - A timeline of new episodes and movie releases, grouped by day (Today, Tomorrow, weekday, date). Dates in another year show the year.
 - Follows your Watchlist plus caught-up shows in Watched, so their next episodes still appear.
 
+### First-run walkthrough
+- Pick the genres you like, tap what you've already seen, and choose the shows you're watching and the season you're on (earlier seasons get checked off).
+- Or skip all that and **import from Trakt** instead. Every step is optional.
+
 ### Discover
 - Search with Google-style suggestions. Tap a suggestion to open its details right away.
+- Two tabs, remembered between visits: **For You** and **Browse**.
+- **For You:** "Because you watched…" rows based on titles you finished, and "Top picks in…" rows for your favorite genres (a different mix each visit). Anything already in your library is left out.
 - **Trending carousel** with 3D DVD-box covers. It loops endlessly, supports swipe and mouse drag (with momentum), has arrow buttons on desktop, and gives a gentle swipe hint after 3 seconds.
 - **Browse** by Movies or Series, by **streaming service** (Netflix, Prime Video, Apple TV+, Disney+, and more), and by **genre**. Filters combine, for example "Popular on Hulu · Comedy".
+- **Popular in your country:** the flag tile shows what's popular to stream where you live.
 - Shows 6 rows at a time with a **Load more** button.
 - Floating **search** button (hidden while the search bar is on screen), plus a **scroll-up** button at the bottom of the page that jumps back to the browse filters.
 
@@ -66,7 +73,7 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 - Sends to **Discord, ntfy, Gotify, Telegram**, or any **webhook**. Nothing is sent on quiet days, and nothing twice.
 
 ### Settings
-- Display name, sign-in method, Trakt status and two-way sync, notifications, and your **country** (used for release dates and the streaming services on Discover).
+- Display name, sign-in method, Trakt status and two-way sync, favorite genres, notifications, and your **country** (used for release dates and the streaming services on Discover).
 
 ### Look and feel
 - "After-hours cinema" theme: plum-black surfaces, ember-amber accent, teal for done states.
@@ -81,8 +88,6 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 | Feature | Status |
 | --- | --- |
-| Onboarding: pick favorite genres, mark what you've watched, choose what you're watching | In development |
-| **For You** on Discover with personal recommendations, plus "Popular in your country" | In development |
 | Sign in with Face ID or Touch ID (passkeys) | Upcoming |
 | Show more than one upcoming episode per show | Upcoming |
 | Loading skeletons and a sliding tab-bar indicator | Upcoming |
@@ -198,6 +203,19 @@ Dockerfile, docker-compose.yml, .env.example
 ## Changelog
 
 <details open>
+<summary><strong>0.8.0 (Day 6, part 2)</strong></summary>
+
+**New**
+- **First-run walkthrough:** pick favorite genres, mark what you've already seen, and add the shows you're watching with the season you're on. Or import from Trakt instead. Existing libraries only get the genre step.
+- **For You** on Discover: "Because you watched…" and "Top picks in…" rows, skipping anything already in your library. The trending carousel lives here now.
+- **Browse** keeps the filters, plus a new **Popular in your country** tile.
+- Discover remembers whether you were on For You or Browse.
+- **Favorite genres** in Settings.
+- Install guide: how to add ScreenGrave to the iPhone home screen, including the plain-HTTP workaround (turn off **Open as Web App**).
+
+</details>
+
+<details>
 <summary><strong>0.7.0 (Day 6)</strong></summary>
 
 Includes 0.6: ScreenGrave now runs on a home server over HTTPS behind a reverse proxy with a wildcard Let's Encrypt certificate.

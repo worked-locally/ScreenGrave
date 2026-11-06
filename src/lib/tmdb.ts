@@ -198,7 +198,7 @@ export interface Provider {
 
 export interface Filter {
   genre: number | null
-  provider: number | null
+  provider: number | 'region' | null // 'region' = anything streaming in your country
 }
 
 // your region (from Settings) for release dates and streaming services
@@ -206,6 +206,7 @@ let REGION = 'US'
 export const setRegion = (code: string) => {
   REGION = code
 }
+export const getRegion = () => REGION
 
 // the services shown first, in this order (matched by name against TMDB's live list)
 const POPULAR_SERVICES: RegExp[] = [
@@ -262,7 +263,10 @@ export async function discover(type: MediaType, filter: Filter, page = 1): Promi
     page: String(page),
   }
   if (filter.genre) params.with_genres = String(filter.genre)
-  if (filter.provider) {
+  if (filter.provider === 'region') {
+    params.watch_region = REGION
+    params.with_watch_monetization_types = 'flatrate|free|ads'
+  } else if (filter.provider) {
     params.with_watch_providers = String(filter.provider)
     params.watch_region = REGION
     params.with_watch_monetization_types = 'flatrate'
@@ -283,4 +287,21 @@ export async function titleGenres(type: MediaType, id: number): Promise<string[]
   const names = ((d.genres ?? []) as { name: string }[]).map((g) => g.name)
   genreCache.set(key, names)
   return names
+}
+
+// ---------- For You and onboarding ----------
+
+const typed = (results: RawResult[], type: MediaType) =>
+  results.map((r) => normalize({ ...r, media_type: r.media_type ?? type })).filter((t): t is Title => t !== null)
+
+// any /discover query, for picks that need their own filters
+export async function discoverTitles(type: MediaType, params: Record<string, string>): Promise<Title[]> {
+  const d = await get(`/discover/${type}`, { include_adult: 'false', ...params })
+  return typed((d.results ?? []) as RawResult[], type)
+}
+
+// TMDB's "if you liked this" list for one title
+export async function recommendations(t: Title): Promise<Title[]> {
+  const d = await get(`/${t.type}/${t.id}/recommendations`)
+  return typed((d.results ?? []) as RawResult[], t.type)
 }

@@ -7,12 +7,16 @@ export interface Prefs {
   displayName: string
   region: string // two-letter country code for release dates and streaming services
   twoWaySync: boolean // send your changes to Trakt
+  genres: string[] // favorite genres for For You on Discover
+  onboarded: boolean // finished (or skipped) the first-run walkthrough
 }
 
 const DEFAULTS: Prefs = {
   displayName: '',
   region: 'US',
   twoWaySync: true,
+  genres: [],
+  onboarded: false,
 }
 
 const getRow = db.prepare('SELECT value FROM settings WHERE key = ?')
@@ -37,6 +41,12 @@ function clean(input: Partial<Record<keyof Prefs, unknown>>): Partial<Prefs> {
   if (typeof input.displayName === 'string') out.displayName = input.displayName.trim().slice(0, 24)
   if (typeof input.region === 'string' && /^[A-Z]{2}$/.test(input.region)) out.region = input.region
   if (typeof input.twoWaySync === 'boolean') out.twoWaySync = input.twoWaySync
+  if (Array.isArray(input.genres)) {
+    out.genres = [...new Set(input.genres.filter((g): g is string => typeof g === 'string').map((g) => g.trim().slice(0, 24)))]
+      .filter(Boolean)
+      .slice(0, 20)
+  }
+  if (typeof input.onboarded === 'boolean') out.onboarded = input.onboarded
   return out
 }
 

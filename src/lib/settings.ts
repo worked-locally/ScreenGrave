@@ -2,6 +2,8 @@ export interface Prefs {
   displayName: string
   region: string
   twoWaySync: boolean
+  genres: string[] // favorite genres for For You
+  onboarded: boolean
 }
 
 export async function getPrefs(): Promise<Prefs> {

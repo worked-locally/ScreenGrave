@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { changeMethod, type Method, type Session } from '../lib/auth'
+import GenrePicker from './GenrePicker'
 import NotifySettings from './NotifySettings'
 import { MethodPicker, SecretInput, secretProblem } from './SignInChoice'
 import { REGIONS, savePrefs, type Prefs } from '../lib/settings'
@@ -148,6 +149,7 @@ export default function SettingsSheet({ prefs, username, passwordSource, method,
   const [trakt, setTrakt] = useState<TraktStatus | null>(null)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
+  const [genres, setGenres] = useState(prefs.genres)
 
   useEffect(() => {
     traktStatus()
@@ -315,6 +317,23 @@ export default function SettingsSheet({ prefs, username, passwordSource, method,
               </button>
             </div>
           )}
+        </Section>
+
+        <Section title="For You">
+          <div className="px-4 py-3.5">
+            <p className="text-sm">Favorite genres</p>
+            <p className="mb-3 mt-0.5 text-xs leading-relaxed text-[#8b8392]">
+              Discover shows top picks for three of these at a time (a different mix each visit), along with picks based on what you've watched.
+            </p>
+            <GenrePicker
+              value={genres}
+              offBackground="#16131a"
+              onChange={(g) => {
+                setGenres(g)
+                void save({ genres: g }, 'Genres saved')
+              }}
+            />
+          </div>
         </Section>
 
         <Section title="Notifications">

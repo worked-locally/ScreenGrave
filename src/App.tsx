@@ -7,12 +7,14 @@ import UserMenu from './components/UserMenu'
 import { getSession, type Session } from './lib/auth'
 import { useEpisodes } from './lib/episodes'
 import { keyOf, useLibrary } from './lib/library'
-import { getPrefs, type Prefs } from './lib/settings'
+import { getPrefs, savePrefs, type Prefs } from './lib/settings'
 import { useShowInfo } from './lib/showinfo'
 import { StatusContext } from './lib/status'
+import { traktStatus } from './lib/trakt'
 import { seasonEpisodes, setRegion, showSeasons, type Title } from './lib/tmdb'
 import Discover from './screens/Discover'
 import Login from './screens/Login'
+import Onboarding, { type OnboardingResult } from './screens/Onboarding'
 import Setup from './screens/Setup'
 import Upcoming from './screens/Upcoming'
 import Watched from './screens/Watched'
@@ -86,7 +88,15 @@ function Shell({ session }: { session: Session }) {
   const [selected, setSelected] = useState<Title | null>(null)
   const [prefs, setPrefs] = useState<Prefs | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [traktReady, setTraktReady] = useState(false) // Trakt is set up on the server
+  const [connectTrakt, setConnectTrakt] = useState(false) // open the Trakt sign-in once onboarding hands off
   const { library, ready, error, setList, remove } = useLibrary()
+
+  useEffect(() => {
+    traktStatus()
+      .then((s) => setTraktReady(s.configured && !s.connected))
+      .catch(() => {})
+  }, [])
 
   // your Settings (region, display name, two-way sync) are loaded before the screens
   useEffect(() => {
@@ -95,7 +105,7 @@ function Shell({ session }: { session: Session }) {
         setRegion(p.region)
         setPrefs(p)
       })
-      .catch(() => setPrefs({ displayName: '', region: 'US', twoWaySync: true }))
+      .catch(() => setPrefs({ displayName: '', region: 'US', twoWaySync: true, genres: [], onboarded: true }))
   }, [])
   const username = prefs?.displayName || session.username
   const ep = useEpisodes()
@@ -169,8 +179,61 @@ function Shell({ session }: { session: Session }) {
     }
   }
 
+  // checks off every aired episode in the seasons before the one you're on
+  async function markSeasonsBefore(t: Title, season: number) {
+    if (season <= 1) return
+    try {
+      const today = new Date().toLocaleDateString('en-CA')
+      const lists = await Promise.all(
+        Array.from({ length: season - 1 }, (_, i) => i + 1).map((n) =>
+          seasonEpisodes(t.id, n)
+            .then((eps) => ({ season: n, eps }))
+            .catch(() => ({ season: n, eps: [] })),
+        ),
+      )
+      const keys = lists.flatMap(({ season: n, eps }) =>
+        eps.filter((e) => !e.airDate || e.airDate <= today).map((e) => `${n}-${e.number}`),
+      )
+      if (keys.length) ep.addBulk({ [keyOf(t)]: keys })
+    } catch {
+      // the show is still on the Watchlist; episodes can be checked off by hand
+    }
+  }
+
+  async function finishOnboarding(r: OnboardingResult) {
+    const next = await savePrefs({ genres: r.genres, onboarded: true }).catch(() => null)
+    setPrefs((p) => next ?? (p ? { ...p, genres: r.genres, onboarded: true } : p))
+    // the episode lookups run in the background while you look around
+    for (const t of r.watched) {
+      setList(t, 'watched')
+      if (t.type === 'tv') void markShowWatched(t)
+    }
+    for (const { title, season } of r.watching) {
+      setList(title, 'watchlist')
+      void markSeasonsBefore(title, season)
+    }
+  }
+
+  async function onboardingToTrakt(genres: string[]) {
+    const next = await savePrefs({ genres, onboarded: true }).catch(() => null)
+    setPrefs((p) => next ?? (p ? { ...p, genres, onboarded: true } : p))
+    setConnectTrakt(true)
+  }
+
   if (error) return <ServerDown />
   if (!ready || !prefs) return <Splash text="Loading your library…" />
+
+  if (!prefs.onboarded) {
+    return (
+      <Onboarding
+        username={username}
+        existing={Object.keys(library).length > 0}
+        traktConfigured={traktReady}
+        onFinish={(r) => void finishOnboarding(r)}
+        onTrakt={(g) => void onboardingToTrakt(g)}
+      />
+    )
+  }
 
   return (
     <StatusContext.Provider value={{ library, info, count: ep.count }}>
@@ -183,12 +246,24 @@ function Shell({ session }: { session: Session }) {
       >
         <div className="status-cover" aria-hidden="true" />
         <TapEffects />
-        <UserMenu username={username} canLogout={session.authRequired} onOpenSettings={() => setSettingsOpen(true)} />
+        <UserMenu
+          username={username}
+          canLogout={session.authRequired}
+          onOpenSettings={() => setSettingsOpen(true)}
+          connectNow={connectTrakt}
+        />
 
         <div key={tab} className="anim-fade">
           {tab === 'watchlist' && <Watchlist library={library} info={info} ep={ep} onSelect={setSelected} />}
           {tab === 'upcoming' && <Upcoming library={library} info={info} onSelect={setSelected} />}
-          {tab === 'discover' && <Discover onSelect={setSelected} />}
+          {tab === 'discover' && (
+            <Discover
+              library={library}
+              favoriteGenres={prefs.genres}
+              onSelect={setSelected}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+          )}
           {tab === 'watched' && <Watched library={library} onSelect={setSelected} />}
         </div>
 

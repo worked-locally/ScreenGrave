@@ -1,24 +1,38 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import Carousel3D from '../components/Carousel3D'
-import Divider from '../components/Divider'
 import FloatingSearch from '../components/FloatingSearch'
+import ForYou from '../components/ForYou'
 import PosterGrid from '../components/PosterGrid'
 import ScreenTitle from '../components/ScreenTitle'
 import ScrollRow from '../components/ScrollRow'
-import { randomPhrase } from '../lib/phrases'
+import type { Library } from '../lib/library'
+import { REGIONS } from '../lib/settings'
 import {
   discover,
   genres,
+  getRegion,
   img,
   providers,
   search,
-  trending,
   type Filter,
   type Genre,
   type MediaType,
   type Provider,
   type Title,
 } from '../lib/tmdb'
+
+const MODE_KEY = 'screengrave:discover-mode'
+type Mode = 'foryou' | 'browse'
+
+function savedMode(): Mode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'browse' ? 'browse' : 'foryou'
+  } catch {
+    return 'foryou'
+  }
+}
+
+// "US" -> the US flag emoji
+const flag = (code: string) => String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0)))
 
 const PER_ROW = 3
 const ROWS_STEP = 6 // 6 full rows at a time
@@ -41,11 +55,13 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 function ServiceTile({
   name,
   logo,
+  label = 'All',
   active,
   onClick,
 }: {
   name: string
   logo?: string | null
+  label?: string // shown in the square when there's no logo
   active: boolean
   onClick: () => void
 }) {
@@ -58,7 +74,11 @@ function ServiceTile({
         className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#1f1a24] text-sm font-semibold text-[#cdc6bd]"
         style={{ boxShadow: active ? '0 0 0 2px var(--accent)' : '0 0 0 2px transparent' }}
       >
-        {logo ? <img src={img(logo, 'w154') ?? ''} alt="" className="h-full w-full object-cover" /> : 'All'}
+        {logo ? (
+          <img src={img(logo, 'w154') ?? ''} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className={label === 'All' ? '' : 'text-2xl'}>{label}</span>
+        )}
       </span>
       <span
         className="w-full truncate text-center text-[11px]"
@@ -70,19 +90,34 @@ function ServiceTile({
   )
 }
 
-export default function Discover({ onSelect }: { onSelect: (t: Title) => void }) {
+interface Props {
+  library: Library
+  favoriteGenres: string[]
+  onSelect: (t: Title) => void
+  onOpenSettings: () => void
+}
+
+export default function Discover({ library, favoriteGenres, onSelect, onOpenSettings }: Props) {
+  const [mode, setModeState] = useState<Mode>(savedMode)
+  const modeRef = useRef<HTMLDivElement>(null)
+  const setMode = (m: Mode) => {
+    setModeState(m)
+    try {
+      localStorage.setItem(MODE_KEY, m)
+    } catch {
+      // storage unavailable; it just won't be remembered
+    }
+  }
+
   // search
   const [query, setQuery] = useState('')
   const [found, setFound] = useState<Title[]>([])
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const browseRef = useRef<HTMLDivElement>(null)
   const q = query.trim()
 
-  // carousel + browse
-  const [phrase] = useState(randomPhrase)
-  const [hot, setHot] = useState<Title[]>([])
+  // browse
   const [type, setType] = useState<MediaType>('movie')
   const [filter, setFilter] = useState<Filter>({ genre: null, provider: null })
   const [genreList, setGenreList] = useState<Genre[]>([])
@@ -98,12 +133,6 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
 
   const key = `${type}:${filter.genre ?? 0}:${filter.provider ?? 0}`
   const loading = browse.key !== key
-
-  useEffect(() => {
-    trending()
-      .then(setHot)
-      .catch((e) => setError(String(e)))
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -127,6 +156,7 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
   }, [query])
 
   useEffect(() => {
+    if (mode !== 'browse') return
     let cancelled = false
     Promise.all([genres(type), providers(type)])
       .then(([g, p]) => {
@@ -138,9 +168,10 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
     return () => {
       cancelled = true
     }
-  }, [type])
+  }, [type, mode])
 
   useEffect(() => {
+    if (mode !== 'browse') return
     let cancelled = false
     discover(type, filter, 1)
       .then((items) => {
@@ -155,7 +186,7 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
+  }, [key, mode])
 
   async function loadMore() {
     const want = (rows + ROWS_STEP) * PER_ROW
@@ -187,9 +218,9 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
     onSelect(t)
   }
 
-  // back up to the divider, so the Movies / Series switch is still in reach
+  // back up to the For You | Browse switch, so the filters are still in reach
   function toBrowse() {
-    const el = browseRef.current
+    const el = modeRef.current
     // leave room for the status bar on iPhone plus a little breathing space
     const top = el ? el.getBoundingClientRect().top + window.scrollY - 72 : 0
     window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
@@ -201,11 +232,13 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
   const shown = browse.items.slice(0, rows * PER_ROW)
   const canMore = !loading && (browse.items.length > shown.length || !browse.done)
 
+  const region = getRegion()
+  const country = REGIONS.find((r) => r.code === region)?.name ?? region
   const service = providerList.find((p) => p.id === filter.provider)
   const genre = genreList.find((g) => g.id === filter.genre)
-  const heading = `${service ? `Popular on ${shortName(service.name)}` : 'Popular'}${genre ? ` · ${genre.name}` : ''} · ${
-    type === 'movie' ? 'Movies' : 'Series'
-  }`
+  const where =
+    filter.provider === 'region' ? `Popular in ${country}` : service ? `Popular on ${shortName(service.name)}` : 'Popular'
+  const heading = `${where}${genre ? ` · ${genre.name}` : ''} · ${type === 'movie' ? 'Movies' : 'Series'}`
 
   return (
     <div>
@@ -283,15 +316,31 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
         <PosterGrid items={found.slice(0, ROWS_STEP * PER_ROW)} onSelect={onSelect} empty="No results." />
       ) : (
         <>
-          <p className="mb-1 text-xs uppercase tracking-widest text-[#8b8392]">Trending this week</p>
-          <Carousel3D items={hot} onSelect={onSelect} />
-
-          <div ref={browseRef} className="scroll-mt-6">
-            <Divider text={phrase} />
+          <div ref={modeRef} className="mb-5 flex gap-6" role="tablist">
+            {(['foryou', 'browse'] as const).map((m) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                className="relative pb-1.5 text-lg font-semibold tracking-tight transition-colors"
+                style={{ color: mode === m ? '#efe9df' : '#6b6473' }}
+              >
+                {m === 'foryou' ? 'For You' : 'Browse'}
+                <span
+                  className="absolute inset-x-0 bottom-0 h-0.5 rounded-full transition-opacity"
+                  style={{ background: 'var(--accent)', opacity: mode === m ? 1 : 0 }}
+                />
+              </button>
+            ))}
           </div>
 
-          <p className="mb-3 text-xs uppercase tracking-widest text-[#8b8392]">Browse</p>
+          {mode === 'foryou' && (
+            <ForYou library={library} genres={favoriteGenres} onSelect={onSelect} onPickGenres={onOpenSettings} />
+          )}
 
+          {mode === 'browse' && (
+        <>
           <div className="mb-5 inline-flex rounded-full bg-[#1f1a24] p-1">
             {(['movie', 'tv'] as const).map((t) => (
               <button
@@ -314,6 +363,12 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
               name="All"
               active={filter.provider === null}
               onClick={() => setFilter((f) => ({ ...f, provider: null }))}
+            />
+            <ServiceTile
+              name={`In ${region}`}
+              label={flag(region)}
+              active={filter.provider === 'region'}
+              onClick={() => setFilter((f) => ({ ...f, provider: 'region' }))}
             />
             {providerList.map((p) => (
               <ServiceTile
@@ -358,9 +413,11 @@ export default function Discover({ onSelect }: { onSelect: (t: Title) => void })
             </button>
           )}
         </>
+          )}
+        </>
       )}
 
-      <FloatingSearch target={inputRef} onUp={q ? undefined : toBrowse} />
+      <FloatingSearch target={inputRef} onUp={q ? undefined : mode === 'browse' ? toBrowse : () => window.scrollTo({ top: 0, behavior: 'smooth' })} />
     </div>
   )
 }

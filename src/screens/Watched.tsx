@@ -4,6 +4,7 @@ import Poster from '../components/Poster'
 import ScreenTitle from '../components/ScreenTitle'
 import ScrollRow from '../components/ScrollRow'
 import { keyOf, type Library } from '../lib/library'
+import { pastRow } from '../lib/scroll'
 import type { Title } from '../lib/tmdb'
 
 type Sort = 'year-desc' | 'year-asc' | 'title' | 'rating' | 'recent'
@@ -30,15 +31,7 @@ export default function Watched({ library, onSelect }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
 
   // the up arrow appears once the fourth row of posters has scrolled off the top
-  const pastFourthRow = useCallback(() => {
-    const posters = Array.from(listRef.current?.querySelectorAll<HTMLElement>('[data-poster]') ?? [])
-    const rows = [...new Set(posters.map((p) => Math.round(p.getBoundingClientRect().top + window.scrollY)))].sort(
-      (a, b) => a - b,
-    )
-    if (rows.length < 4) return Infinity // short list: no arrow needed
-    const height = posters[0].getBoundingClientRect().height
-    return rows[3] + height
-  }, [])
+  const pastFourthRow = useCallback(() => pastRow(listRef.current, 4), [])
   const toTop = useCallback(() => window.scrollTo({ top: 0, behavior: 'smooth' }), [])
 
   const all = Object.values(library).filter((e) => e.list === 'watched')

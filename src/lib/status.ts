@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { todayStr } from './dates'
 import { keyOf, type Library } from './library'
 import type { Info, Title } from './tmdb'
 
@@ -12,7 +13,6 @@ interface Ctx {
 
 export const StatusContext = createContext<Ctx>({ library: {}, info: {}, count: () => 0 })
 
-const todayStr = () => new Date().toLocaleDateString('en-CA')
 
 export function useStatusOf() {
   const { library, info, count } = useContext(StatusContext)

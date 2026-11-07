@@ -85,7 +85,8 @@ const hashToken = (token: string) => sha256(`${token}\0${secretKey()}`).toString
 const insertSession = db.prepare('INSERT INTO sessions (token_hash, expires_at) VALUES (?, ?)')
 const findSession = db.prepare('SELECT expires_at FROM sessions WHERE token_hash = ?')
 const deleteSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?')
-db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
+const dropExpired = db.prepare('DELETE FROM sessions WHERE expires_at < ?')
+dropExpired.run(Date.now())
 
 function isSignedIn(c: Context) {
   const method = currentMethod()
@@ -104,11 +105,22 @@ function startSession(c: Context) {
   setCookie(c, COOKIE, token, { httpOnly: true, sameSite: 'Lax', secure, path: '/', maxAge: MAX_AGE })
 }
 
-// ----- slow down guessing (8 wrong tries per 15 minutes, per device) -----
+// ----- slow down guessing -----
+// 8 wrong tries per 15 minutes from one address, and 30 from everyone combined,
+// so a 4-digit PIN can't be worked through by spreading guesses over many addresses.
 
 const WINDOW = 15 * 60 * 1000
 const MAX_FAILS = 8
+const MAX_FAILS_ALL = 30
+const EVERYONE = '*'
 const failures = new Map<string, { count: number; first: number }>()
+
+// tidy up once an hour: expired sessions and old failure counts
+setInterval(() => {
+  const now = Date.now()
+  dropExpired.run(now)
+  for (const [k, v] of failures) if (now - v.first >= WINDOW) failures.delete(k)
+}, 60 * 60 * 1000).unref()
 
 function clientOf(c: Context) {
   try {
@@ -118,17 +130,24 @@ function clientOf(c: Context) {
   }
 }
 
-function tooManyAttempts(who: string) {
-  const prev = failures.get(who)
-  return !!prev && Date.now() - prev.first < WINDOW && prev.count >= MAX_FAILS
+function over(key: string, max: number) {
+  const prev = failures.get(key)
+  return !!prev && Date.now() - prev.first < WINDOW && prev.count >= max
+}
+
+const tooManyAttempts = (who: string) => over(who, MAX_FAILS) || over(EVERYONE, MAX_FAILS_ALL)
+
+function bump(key: string) {
+  const now = Date.now()
+  const prev = failures.get(key)
+  const entry = prev && now - prev.first < WINDOW ? prev : { count: 0, first: now }
+  entry.count++
+  failures.set(key, entry)
 }
 
 async function recordFailure(who: string) {
-  const now = Date.now()
-  const prev = failures.get(who)
-  const entry = prev && now - prev.first < WINDOW ? prev : { count: 0, first: now }
-  entry.count++
-  failures.set(who, entry)
+  bump(who)
+  bump(EVERYONE)
   await new Promise((r) => setTimeout(r, 500))
 }
 

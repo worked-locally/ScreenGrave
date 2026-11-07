@@ -151,6 +151,7 @@ const line = (r: Release) => `${r.title} — ${r.label}${r.name ? `: ${r.name}` 
 
 async function post(url: string, body: unknown, headers: Record<string, string> = {}) {
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(15_000),
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),

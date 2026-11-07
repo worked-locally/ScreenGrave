@@ -57,6 +57,7 @@ async function tokenRequest(redirectUri: string, params: Record<string, string>)
   const body = new URLSearchParams({ client_id: CLIENT_ID, ...params })
   if (redirectUri) body.set('redirect_uri', redirectUri)
   const res = await fetch(`${AUTH_URL}/oauth/token`, {
+    signal: AbortSignal.timeout(20_000),
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
@@ -99,12 +100,13 @@ async function accessToken(): Promise<string> {
   } catch (e) {
     console.error('[screengrave] Trakt token refresh failed:', e)
     delSetting.run('trakt_tokens')
-    throw new Error('Your Trakt login expired. Connect Trakt again.')
+    throw new Error('Your Trakt login expired. Connect Trakt again.', { cause: e })
   }
 }
 
 async function traktPost<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
+    signal: AbortSignal.timeout(20_000),
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -121,6 +123,7 @@ async function traktPost<T>(path: string, body: unknown): Promise<T> {
 
 async function traktGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
+    signal: AbortSignal.timeout(20_000),
     headers: {
       'content-type': 'application/json',
       'trakt-api-version': '2',
@@ -506,6 +509,7 @@ let device: { code: string; interval: number; expiresAt: number } | null = null
 
 async function deviceRequest(path: string, payload: Record<string, string>) {
   return fetch(`${AUTH_URL}${path}`, {
+    signal: AbortSignal.timeout(20_000),
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': UA },
     body: JSON.stringify(payload),

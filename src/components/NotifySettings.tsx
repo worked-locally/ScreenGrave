@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Switch from './Switch'
 
 type Service = 'discord' | 'ntfy' | 'gotify' | 'telegram' | 'webhook'
 
@@ -83,19 +84,7 @@ export default function NotifySettings() {
             One message a day for shows you follow and movies on your watchlist.
           </p>
         </div>
-        <button
-          role="switch"
-          aria-checked={cfg.enabled}
-          aria-label="Notifications"
-          onClick={() => void save(!cfg.enabled)}
-          className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-          style={{ background: cfg.enabled ? 'var(--accent)' : '#3a3340' }}
-        >
-          <span
-            className="absolute top-1 h-5 w-5 rounded-full bg-[#efe9df] transition-transform"
-            style={{ left: 4, transform: cfg.enabled ? 'translateX(20px)' : 'none' }}
-          />
-        </button>
+        <Switch on={cfg.enabled} label="Notifications" onToggle={() => void save(!cfg.enabled)} />
       </div>
 
       <div>

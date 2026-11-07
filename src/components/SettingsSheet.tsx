@@ -1,9 +1,13 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { changeMethod, type Method, type Session } from '../lib/auth'
+import { changeMethod, secretProblem, type Method, type Session } from '../lib/auth'
+import { useBodyLock } from '../lib/bodyLock'
+import { ago } from '../lib/dates'
 import GenrePicker from './GenrePicker'
 import NotifySettings from './NotifySettings'
-import { MethodPicker, SecretInput, secretProblem } from './SignInChoice'
+import Switch from './Switch'
+import { MethodPicker, SecretInput } from './SignInChoice'
 import { REGIONS, savePrefs, type Prefs } from '../lib/settings'
+import { useTapCount } from '../lib/taps'
 import { traktDisconnect, traktStatus, type TraktStatus } from '../lib/trakt'
 
 interface Props {
@@ -34,32 +38,6 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
       {children}
     </div>
   )
-}
-
-function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={onToggle}
-      className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-      style={{ background: on ? 'var(--accent)' : '#3a3340' }}
-    >
-      <span
-        className="absolute top-1 h-5 w-5 rounded-full bg-[#efe9df] transition-transform"
-        style={{ left: 4, transform: on ? 'translateX(20px)' : 'none' }}
-      />
-    </button>
-  )
-}
-
-const ago = (ms: number) => {
-  const min = Math.round((Date.now() - ms) / 60_000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min} min ago`
-  const h = Math.round(min / 60)
-  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`
 }
 
 const METHOD_NAME: Record<Method, string> = { pin: 'PIN', password: 'Password', none: 'No sign-in' }
@@ -150,6 +128,7 @@ export default function SettingsSheet({ prefs, username, passwordSource, method,
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
   const [genres, setGenres] = useState(prefs.genres)
+  const tapVersion = useTapCount()
 
   useEffect(() => {
     traktStatus()
@@ -157,21 +136,7 @@ export default function SettingsSheet({ prefs, username, passwordSource, method,
       .catch(() => {})
   }, [])
 
-  // keep the page behind still while Settings is open
-  useEffect(() => {
-    const y = window.scrollY
-    const body = document.body
-    const prev = { position: body.style.position, top: body.style.top, width: body.style.width }
-    body.style.position = 'fixed'
-    body.style.top = `-${y}px`
-    body.style.width = '100%'
-    return () => {
-      body.style.position = prev.position
-      body.style.top = prev.top
-      body.style.width = prev.width
-      window.scrollTo(0, y)
-    }
-  }, [])
+  useBodyLock()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -357,7 +322,9 @@ export default function SettingsSheet({ prefs, username, passwordSource, method,
         </Section>
 
         <Section title="About">
-          <Row label="ScreenGrave" hint={`Version ${__APP_VERSION__}`} />
+          <div onClick={tapVersion} className="select-none">
+            <Row label="ScreenGrave" hint={`Version ${__APP_VERSION__}`} />
+          </div>
           <div className="px-4 py-3.5 text-xs leading-relaxed text-[#8b8392]">
             Data and images from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.
           </div>

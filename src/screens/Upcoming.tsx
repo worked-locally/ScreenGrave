@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import ScreenTitle from '../components/ScreenTitle'
+import { todayStr } from '../lib/dates'
 import { keyOf, type Library } from '../lib/library'
-import { img, type Info, type Title } from '../lib/tmdb'
+import { img, type Info, type Title, type Upcoming as Item } from '../lib/tmdb'
 
 interface Props {
   library: Library
@@ -8,7 +10,17 @@ interface Props {
   onSelect: (t: Title) => void
 }
 
-const todayStr = () => new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+const RANGE_KEY = 'screengrave:upcoming-weeks'
+
+const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toLocaleDateString('en-CA')
+
+function savedWeeks(): 2 | 4 {
+  try {
+    return localStorage.getItem(RANGE_KEY) === '4' ? 4 : 2
+  } catch {
+    return 2
+  }
+}
 
 function dayParts(date: string) {
   const d = new Date(`${date}T00:00:00`)
@@ -26,18 +38,40 @@ function dayParts(date: string) {
   return { label, short }
 }
 
+// a show's entries for this range: every episode day inside it, or just its next episode when none fall inside
+function entriesFor(i: Info | undefined, today: string, until: string): Item[] {
+  if (!i?.next || i.next.date < today) return []
+  const inside = (i.soon ?? []).filter((s) => s.date >= today && s.date <= until)
+  return inside.length ? inside : [i.next]
+}
+
 export default function Upcoming({ library, info, onSelect }: Props) {
+  const [weeks, setWeeksState] = useState<2 | 4>(savedWeeks)
+  const setWeeks = (w: 2 | 4) => {
+    setWeeksState(w)
+    try {
+      localStorage.setItem(RANGE_KEY, String(w))
+    } catch {
+      // storage unavailable; it just won't be remembered
+    }
+  }
+
   const today = todayStr()
   // your Watchlist plus caught-up shows in Watched, so their next episodes still show here
-  const watchlist = Object.values(library)
+  const tracked = Object.values(library)
     .filter((e) => e.list === 'watchlist' || (e.list === 'watched' && e.title.type === 'tv'))
     .map((e) => e.title)
-  const upcoming = watchlist
-    .map((t) => ({ t, next: info[keyOf(t)]?.next }))
-    .filter((x): x is { t: Title; next: NonNullable<Info['next']> } => !!x.next && x.next.date >= today)
-    .sort((a, b) => a.next.date.localeCompare(b.next.date) || a.t.title.localeCompare(b.t.title))
 
-  const loading = watchlist.filter((t) => !info[keyOf(t)]).length
+  const build = (until: string) =>
+    tracked
+      .flatMap((t) => entriesFor(info[keyOf(t)], today, until).map((next) => ({ t, next })))
+      .sort((a, b) => a.next.date.localeCompare(b.next.date) || a.t.title.localeCompare(b.t.title))
+
+  const upcoming = build(inDays(weeks * 7))
+  // the button only shows when 4 weeks would actually add something
+  const moreIn4 = weeks === 2 && build(inDays(28)).length > upcoming.length
+
+  const loading = tracked.filter((t) => !info[keyOf(t)]).length
 
   const groups: { date: string; items: typeof upcoming }[] = []
   for (const x of upcoming) {
@@ -75,7 +109,7 @@ export default function Upcoming({ library, info, onSelect }: Props) {
               <div className="space-y-2.5">
                 {g.items.map(({ t, next }) => (
                   <button
-                    key={keyOf(t)}
+                    key={`${keyOf(t)}-${next.date}`}
                     onClick={() => onSelect(t)}
                     className="flex w-full items-center gap-3 rounded-2xl bg-[#16131a] p-2.5 text-left transition-transform active:scale-[0.98]"
                   >
@@ -98,6 +132,15 @@ export default function Upcoming({ library, info, onSelect }: Props) {
           )
         })}
       </div>
+
+      {(moreIn4 || weeks === 4) && groups.length > 0 && (
+        <button
+          onClick={() => setWeeks(weeks === 2 ? 4 : 2)}
+          className="mx-auto mt-2 block rounded-full bg-[#1f1a24] px-5 py-2 text-sm font-medium text-[#cdc6bd] transition-transform active:scale-95"
+        >
+          {weeks === 2 ? 'Show 4 weeks' : 'Show 2 weeks'}
+        </button>
+      )}
     </div>
   )
 }

@@ -78,6 +78,8 @@ The first time, ScreenGrave asks for your name and how you want to sign in:
 
 > Do this right after the first start: until it's chosen, whoever opens the app first gets to choose. You can change it later in **Settings**.
 
+> Planning to reach ScreenGrave from outside your home? Read [Security and privacy](security.md#running-it-on-the-internet) first.
+
 ### Add it to your iPhone home screen
 
 **If you open ScreenGrave with `https://`** (your own domain behind a reverse proxy):

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import DetailSheet from './components/DetailSheet'
-import SettingsSheet from './components/SettingsSheet'
+import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react'
+import Celebrations from './components/Celebrate'
+import RollHost from './components/RollHost'
 import TabBar, { type Tab } from './components/TabBar'
 import TapEffects from './components/TapEffects'
 import UserMenu from './components/UserMenu'
@@ -12,13 +12,29 @@ import { useShowInfo } from './lib/showinfo'
 import { StatusContext } from './lib/status'
 import { traktStatus } from './lib/trakt'
 import { seasonEpisodes, setRegion, showSeasons, type Title } from './lib/tmdb'
-import Discover from './screens/Discover'
-import Login from './screens/Login'
-import Onboarding, { type OnboardingResult } from './screens/Onboarding'
-import Setup from './screens/Setup'
-import Upcoming from './screens/Upcoming'
-import Watched from './screens/Watched'
+import type { OnboardingResult } from './screens/Onboarding'
 import Watchlist from './screens/Watchlist'
+
+// The Watchlist (the first screen) comes with the app. Everything else is a separate file that
+// downloads in the background right after, so the first screen shows up sooner and later taps stay instant.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function later<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) {
+  return Object.assign(lazy(load), { preload: load })
+}
+const Discover = later(() => import('./screens/Discover'))
+const Upcoming = later(() => import('./screens/Upcoming'))
+const Watched = later(() => import('./screens/Watched'))
+const DetailSheet = later(() => import('./components/DetailSheet'))
+const SettingsSheet = later(() => import('./components/SettingsSheet'))
+const Login = later(() => import('./screens/Login'))
+const Setup = later(() => import('./screens/Setup'))
+const Onboarding = later(() => import('./screens/Onboarding'))
+
+function whenIdle(fn: () => void) {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void) => number }
+  if (w.requestIdleCallback) w.requestIdleCallback(fn)
+  else window.setTimeout(fn, 800)
+}
 
 // remembers which shows the app moved on its own, so it can tell those apart from your own changes
 const AUTO_MOVES = 'screengrave:auto-moves'
@@ -62,6 +78,7 @@ export default function App() {
   if (!session) return <Splash text="Loading…" />
   if (session.setupRequired) {
     return (
+      <Suspense fallback={<Splash text="Loading…" />}>
       <Setup
         onDone={() =>
           getSession()
@@ -69,15 +86,18 @@ export default function App() {
             .catch(() => setDown(true))
         }
       />
+      </Suspense>
     )
   }
   if (session.authRequired && !session.authenticated) {
     return (
+      <Suspense fallback={<Splash text="Loading…" />}>
       <Login
         username={session.username}
         method={session.method}
         onSuccess={() => setSession({ ...session, authenticated: true })}
       />
+      </Suspense>
     )
   }
   return <Shell session={session} />
@@ -107,6 +127,10 @@ function Shell({ session }: { session: Session }) {
       })
       .catch(() => setPrefs({ displayName: '', region: 'US', twoWaySync: true, genres: [], onboarded: true }))
   }, [])
+  // once you're in, fetch the other screens quietly in the background
+  useEffect(() => {
+    whenIdle(() => [Discover, Upcoming, Watched, DetailSheet, SettingsSheet].forEach((c) => void c.preload()))
+  }, [])
   const username = prefs?.displayName || session.username
   const ep = useEpisodes()
 
@@ -121,7 +145,7 @@ function Shell({ session }: { session: Session }) {
   const count = ep.count
   useEffect(() => {
     if (!ready) return
-    let records: Record<string, MoveRecord> = {}
+    let records: Record<string, MoveRecord>
     try {
       records = JSON.parse(localStorage.getItem(AUTO_MOVES) ?? '{}')
     } catch {
@@ -225,6 +249,7 @@ function Shell({ session }: { session: Session }) {
 
   if (!prefs.onboarded) {
     return (
+      <Suspense fallback={<Splash text="Loading…" />}>
       <Onboarding
         username={username}
         existing={Object.keys(library).length > 0}
@@ -232,6 +257,7 @@ function Shell({ session }: { session: Session }) {
         onFinish={(r) => void finishOnboarding(r)}
         onTrakt={(g) => void onboardingToTrakt(g)}
       />
+      </Suspense>
     )
   }
 
@@ -246,6 +272,8 @@ function Shell({ session }: { session: Session }) {
       >
         <div className="status-cover" aria-hidden="true" />
         <TapEffects />
+        <Celebrations />
+        <RollHost />
         <UserMenu
           username={username}
           canLogout={session.authRequired}
@@ -254,6 +282,7 @@ function Shell({ session }: { session: Session }) {
         />
 
         <div key={tab} className="anim-fade">
+          <Suspense fallback={null}>
           {tab === 'watchlist' && <Watchlist library={library} info={info} ep={ep} onSelect={setSelected} />}
           {tab === 'upcoming' && <Upcoming library={library} info={info} onSelect={setSelected} />}
           {tab === 'discover' && (
@@ -265,10 +294,12 @@ function Shell({ session }: { session: Session }) {
             />
           )}
           {tab === 'watched' && <Watched library={library} onSelect={setSelected} />}
+          </Suspense>
         </div>
 
         <TabBar active={tab} onChange={setTab} />
 
+        <Suspense fallback={null}>
         {selected && (
           <DetailSheet
             title={selected}
@@ -293,6 +324,7 @@ function Shell({ session }: { session: Session }) {
             onClose={() => setSettingsOpen(false)}
           />
         )}
+        </Suspense>
       </div>
     </StatusContext.Provider>
   )

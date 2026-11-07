@@ -48,18 +48,5 @@ export function useLibrary() {
     })
   }, [])
 
-  // adds titles that aren't in the library yet (used by the Trakt import later)
-  const addMany = useCallback((entries: { title: Title; list: ListName }[]) => {
-    const now = Date.now()
-    const batch: Library = {}
-    for (const e of entries) batch[keyOf(e.title)] = { ...e, addedAt: now }
-    api.importData(batch, {}).catch(reportSaveError)
-    setLibrary((l) => {
-      const next = { ...l }
-      for (const [k, e] of Object.entries(batch)) if (!next[k]) next[k] = e
-      return next
-    })
-  }, [])
-
-  return { library, ready, error, setList, remove, addMany }
+  return { library, ready, error, setList, remove }
 }

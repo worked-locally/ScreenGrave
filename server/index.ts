@@ -2,12 +2,14 @@ import './env'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
 import { existsSync } from 'node:fs'
 import { api } from './api'
 import { auth, PASSWORD_SOURCE, requireAuth } from './auth'
 import { db } from './db'
 import { TMDB_TOKEN } from './tmdb'
 import { notify, startScheduler } from './notify'
+import { sameOrigin, securityHeaders, timeout } from './security'
 import { settings } from './settings'
 import { trakt } from './trakt'
 import { VERSION } from './version'
@@ -19,6 +21,10 @@ if (PASSWORD_SOURCE === 'app') console.log('[screengrave] sign-in is managed in 
 
 const app = new Hono()
 
+app.use('*', securityHeaders)
+// requests that change things must come from ScreenGrave itself, and stay a sensible size
+app.use('/api/*', sameOrigin)
+app.use('/api/*', bodyLimit({ maxSize: 2 * 1024 * 1024, onError: (c) => c.json({ error: 'request too large' }, 413) }))
 // every /api route below needs a signed-in session (health and /api/auth are exempt)
 app.use('/api/*', requireAuth)
 
@@ -37,7 +43,9 @@ app.get('/api/tmdb/*', async (c) => {
 
   const res = await fetch(`https://api.themoviedb.org/3${path}${url.search}`, {
     headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: 'application/json' },
-  })
+    signal: timeout(),
+  }).catch(() => null)
+  if (!res) return c.json({ error: 'TMDB did not answer in time' }, 504)
   return new Response(res.body, {
     // a TMDB 401 means a bad token, not a signed-out user, so it shouldn't trigger the login screen
     status: res.status === 401 ? 502 : res.status,

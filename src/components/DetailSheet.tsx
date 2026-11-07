@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useBodyLock } from '../lib/bodyLock'
 import type { useEpisodes } from '../lib/episodes'
 import type { ListName } from '../lib/library'
 import { img, titleGenres, type Title } from '../lib/tmdb'
@@ -14,6 +15,48 @@ interface Props {
   ep: ReturnType<typeof useEpisodes>
 }
 
+// the overview, cut to 4 lines with "Read more" when it's long
+function Overview({ text }: { text: string }) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  const [open, setOpen] = useState(false)
+  const [long, setLong] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el && !open) setLong(el.scrollHeight > el.clientHeight + 1)
+  }, [text, open])
+
+  const cut = long && !open
+  return (
+    <div className="mt-4">
+      <p
+        ref={ref}
+        className={`text-sm leading-relaxed text-[#cdc6bd] ${open ? '' : 'line-clamp-4'}`}
+        style={
+          cut
+            ? {
+                maskImage: 'linear-gradient(to bottom, #000 60%, transparent)',
+                WebkitMaskImage: 'linear-gradient(to bottom, #000 60%, transparent)',
+              }
+            : undefined
+        }
+      >
+        {text}
+      </p>
+      {long && (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="mt-1 text-sm font-medium"
+          style={{ color: 'var(--accent)' }}
+          aria-expanded={open}
+        >
+          {open ? 'Show less' : 'Read more'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 const LISTS: { id: ListName; label: string }[] = [
   { id: 'watchlist', label: 'Watchlist' },
   { id: 'watched', label: 'Watched' },
@@ -27,21 +70,7 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
-  // lock the page behind the sheet without losing its scroll position
-  useEffect(() => {
-    const y = window.scrollY
-    const body = document.body
-    const prev = { position: body.style.position, top: body.style.top, width: body.style.width }
-    body.style.position = 'fixed'
-    body.style.top = `-${y}px`
-    body.style.width = '100%'
-    return () => {
-      body.style.position = prev.position
-      body.style.top = prev.top
-      body.style.width = prev.width
-      window.scrollTo(0, y)
-    }
-  }, [])
+  useBodyLock()
 
   useEffect(() => {
     let cancelled = false
@@ -82,9 +111,9 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-[#efe9df] backdrop-blur-sm transition-transform active:scale-90"
+            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-[#efe9df] backdrop-blur-sm transition-transform active:scale-90"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-4 w-4">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" className="h-5 w-5">
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
@@ -114,9 +143,7 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
             </div>
           </div>
 
-          {title.overview && (
-            <p className="mt-4 text-sm leading-relaxed text-[#cdc6bd]">{title.overview}</p>
-          )}
+          {title.overview && <Overview key={`${title.type}-${title.id}`} text={title.overview} />}
 
           {genreNames.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">

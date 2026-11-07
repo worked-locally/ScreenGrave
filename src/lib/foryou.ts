@@ -1,4 +1,4 @@
-import type { Library } from './library'
+import { keyOf, type Library } from './library'
 import { discoverTitles, recommendations, type MediaType, type Title } from './tmdb'
 
 // Friendly genres for onboarding and For You. TMDB numbers movie and TV genres differently,
@@ -33,8 +33,6 @@ export function genreIds(type: MediaType, names: string[]): number[] {
   const ids = GENRE_CHOICES.filter((g) => names.includes(g.name)).flatMap((g) => g[type])
   return [...new Set(ids)]
 }
-
-const keyOf = (t: Title) => `${t.type}-${t.id}`
 
 // a, b, a, b, ... without repeats
 function interleave(a: Title[], b: Title[]): Title[] {

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import GenrePicker from '../components/GenrePicker'
+import { SkeletonGrid } from '../components/Skeleton'
 import { airingNow, famous, interleave } from '../lib/foryou'
+import { keyOf } from '../lib/library'
 import { img, search, showSeasons, type Season, type Title } from '../lib/tmdb'
 
 // First-run walkthrough: what you like, what you've seen, what you're watching.
@@ -21,8 +23,6 @@ interface Props {
 }
 
 type Step = 'genres' | 'watched' | 'watching'
-
-const keyOf = (t: Title) => `${t.type}-${t.id}`
 
 function Tile({ t, badge, tone, onClick }: { t: Title; badge?: string; tone?: 'done' | 'accent'; onClick: () => void }) {
   const color = tone === 'done' ? 'var(--done)' : 'var(--accent)'
@@ -68,19 +68,18 @@ function Picker({
   onTap: (t: Title) => void
 }) {
   const [query, setQuery] = useState('')
-  const [found, setFound] = useState<Title[] | null>(null)
+  const [results, setResults] = useState<Title[] | null>(null)
+  const term = query.trim()
+  // while the box is empty, the suggestions show; old results are kept only while you're still typing
+  const found = term ? results : null
 
   useEffect(() => {
-    const term = query.trim()
-    if (!term) {
-      setFound(null)
-      return
-    }
+    if (!term) return
     let cancelled = false
     const timer = setTimeout(() => {
       search(term)
         .then((r) => {
-          if (!cancelled) setFound(r.filter((t) => (tvOnly ? t.type === 'tv' : true) && t.poster).slice(0, 18))
+          if (!cancelled) setResults(r.filter((t) => (tvOnly ? t.type === 'tv' : true) && t.poster).slice(0, 18))
         })
         .catch(() => {})
     }, 250)
@@ -88,7 +87,7 @@ function Picker({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [query, tvOnly])
+  }, [term, tvOnly])
 
   const items = found ?? suggestions
   return (
@@ -102,7 +101,11 @@ function Picker({
         className="mb-4 w-full rounded-2xl bg-[#1f1a24] px-4 py-3 text-base outline-none placeholder:text-[#8b8392]"
       />
       {items.length === 0 ? (
-        <p className="mt-12 text-center text-sm text-[#8b8392]">{found ? 'No results.' : 'Loading…'}</p>
+        found ? (
+          <p className="mt-12 text-center text-sm text-[#8b8392]">No results.</p>
+        ) : (
+          <SkeletonGrid />
+        )
       ) : (
         <div className="grid grid-cols-3 items-start gap-3">
           {items.map((t) => {

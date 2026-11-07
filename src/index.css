@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Inter, Latin and Latin Extended only: everything ScreenGrave shows in English and most European languages.
+   Other scripts fall back to the system font. */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
 :root {
   color-scheme: dark;
   --accent: #ff9f45;
@@ -86,8 +105,71 @@ body {
 .anim-sheet { animation: sheet-up 280ms cubic-bezier(0.32, 0.72, 0, 1); }
 .anim-fade { animation: fade-in 200ms ease-out; }
 
+/* focus rings: none after a tap or click; a soft amber ring for people moving around with the keyboard */
+:focus:not(:focus-visible) { outline: none; }
+:focus-visible {
+  outline: 2px solid rgba(255, 159, 69, 0.7);
+  outline-offset: 2px;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+
+/* the rarer tap burst */
+.tap-bit {
+  position: absolute;
+  width: 9px;
+  height: 8px;
+  margin: -4px 0 0 -4.5px;
+  border-radius: 55% 45% 50% 50%;
+  background: radial-gradient(circle at 40% 35%, #fffdf6, #f5e6c0 70%);
+  box-shadow: 3px -2px 0 -1px #fff8e6, -3px -1px 0 -1px #fbf0d4, 0 2px 0 -2px #e8b44a;
+  animation: tap-bit 900ms cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+}
+@keyframes tap-bit {
+  0% { transform: translate(0, 0) rotate(0) scale(calc(var(--s) * 0.4)); opacity: 1; }
+  40% { transform: translate(calc(var(--dx) * 0.6), var(--dy)) rotate(calc(var(--rot) * 0.5)) scale(var(--s)); opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 90px)) rotate(var(--rot)) scale(var(--s)); opacity: 0; }
+}
+
+/* celebration: finishing a season or catching up on a show */
+.party-bit {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 9999px;
+  opacity: 0;
+  animation: party 1100ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.party-strip {
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+}
+@keyframes party {
+  0% { transform: translate(0, 0) rotate(0) scale(0.6); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 60px)) rotate(var(--spin)) scale(1); opacity: 0; }
+}
+@keyframes pop-in {
+  0% { transform: translateY(-8px) scale(0.92); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.anim-pop { animation: pop-in 260ms cubic-bezier(0.32, 0.72, 0, 1); }
+
+/* loading placeholders: a soft light sweeps across */
+.skeleton {
+  background: linear-gradient(100deg, #1a161e 30%, #241e29 50%, #1a161e 70%) #1a161e;
+  background-size: 300% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .anim-sheet, .anim-fade { animation: none; }
+  .anim-sheet, .anim-fade, .anim-pop { animation: none; }
+  .skeleton { animation: none; }
 }
 
 html { scrollbar-gutter: stable; }

@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState, type MouseEvent } from 'react'
 import type { useEpisodes } from '../lib/episodes'
 import { seasonEpisodes, showSeasons, type Episode, type Season, type Title } from '../lib/tmdb'
+import { todayStr } from '../lib/dates'
+import { StatusContext } from '../lib/status'
+import { celebrate } from '../lib/celebrate'
 import ScrollRow from './ScrollRow'
 
 interface Props {
@@ -9,7 +12,6 @@ interface Props {
   onActivity: () => void
 }
 
-const todayStr = () => new Date().toLocaleDateString('en-CA')
 
 // the first started season you haven't finished, otherwise the latest started season
 function pickSeason(seasons: Season[], watchedIn: (season: number) => number): number {
@@ -57,6 +59,16 @@ export default function EpisodeTracker({ show, ep, onActivity }: Props) {
   const airedNumbers = episodes.filter(aired).map((e) => e.number)
   const watchedCount = airedNumbers.filter((n) => ep.isWatched(showKey, season, n)).length
   const allWatched = airedNumbers.length > 0 && watchedCount === airedNumbers.length
+  const { info } = useContext(StatusContext)
+
+  // finishing a season, or the last aired episode of the whole show, gets a little party
+  function cheer(added: number, e: MouseEvent<HTMLElement>) {
+    const r = e.currentTarget.getBoundingClientRect()
+    const from = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+    const aired = info[showKey]?.aired ?? 0
+    if (aired > 0 && ep.count(showKey) + added >= aired) celebrate(`All caught up on ${show.title}`, from)
+    else celebrate(`Season ${season} complete`, from)
+  }
 
   if (error) return <p className="mt-6 text-sm text-red-400">{error}</p>
   if (!seasons.length) return null
@@ -86,9 +98,12 @@ export default function EpisodeTracker({ show, ep, onActivity }: Props) {
           {watchedCount} / {airedNumbers.length} watched
         </p>
         <button
-          onClick={() => {
+          onClick={(e) => {
             ep.markSeason(showKey, season, airedNumbers, !allWatched)
-            if (!allWatched) onActivity()
+            if (!allWatched) {
+              onActivity()
+              cheer(airedNumbers.length - watchedCount, e)
+            }
           }}
           className="text-sm"
           style={{ color: 'var(--accent)' }}
@@ -105,9 +120,12 @@ export default function EpisodeTracker({ show, ep, onActivity }: Props) {
             <button
               key={e.number}
               disabled={!isAired}
-              onClick={() => {
+              onClick={(ev) => {
                 ep.toggle(showKey, season, e.number)
-                if (!done) onActivity()
+                if (!done) {
+                  onActivity()
+                  if (isAired && watchedCount + 1 === airedNumbers.length) cheer(1, ev)
+                }
               }}
               className="flex w-full items-center gap-3 border-b border-white/5 py-3 text-left disabled:opacity-40"
             >

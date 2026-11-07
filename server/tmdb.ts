@@ -14,6 +14,7 @@ export interface Title {
 export async function tmdbGet(path: string) {
   const res = await fetch(`https://api.themoviedb.org/3${path}`, {
     headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
   })
   if (!res.ok) throw new Error(`TMDB ${res.status} on ${path}`)
   return res.json()

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { becauseYouWatched, seeds, topPicks } from '../lib/foryou'
-import type { Library } from '../lib/library'
+import { keyOf, type Library } from '../lib/library'
 import { randomPhrase } from '../lib/phrases'
 import { trending, type Title } from '../lib/tmdb'
 import Carousel3D from './Carousel3D'
 import Divider from './Divider'
 import Poster from './Poster'
 import ScrollRow from './ScrollRow'
+import { CarouselSkeleton, SkeletonRow } from './Skeleton'
 
 interface Row {
   id: string
@@ -14,8 +15,6 @@ interface Row {
   name: string // the genre or title, in the accent color
   items: Title[]
 }
-
-const keyOf = (t: Title) => `${t.type}-${t.id}`
 
 function PosterRow({ row, onSelect }: { row: Row; onSelect: (t: Title) => void }) {
   return (
@@ -27,6 +26,7 @@ function PosterRow({ row, onSelect }: { row: Row; onSelect: (t: Title) => void }
         {row.items.map((t) => (
           <button
             key={keyOf(t)}
+            data-poster
             onClick={() => onSelect(t)}
             className="w-[7.25rem] shrink-0 text-left transition-transform active:scale-95"
           >
@@ -104,7 +104,7 @@ export default function ForYou({ library, genres, onSelect, onPickGenres }: Prop
     <>
       {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
       <p className="mb-1 text-xs uppercase tracking-widest text-[#8b8392]">Trending this week</p>
-      <Carousel3D items={hot} onSelect={onSelect} />
+      {hot.length ? <Carousel3D items={hot} onSelect={onSelect} /> : !error && <CarouselSkeleton />}
 
       <Divider text={phrase} />
 
@@ -118,7 +118,11 @@ export default function ForYou({ library, genres, onSelect, onPickGenres }: Prop
       )}
 
       {rows === null ? (
-        <p className="mt-10 text-center text-sm text-[#8b8392]">Finding picks for you…</p>
+        <>
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </>
       ) : rows.length === 0 ? (
         genres.length > 0 && (
           <p className="mt-10 text-center text-sm text-[#8b8392]">No picks right now. Try again later.</p>

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { MethodPicker, SecretInput, secretProblem } from '../components/SignInChoice'
-import { setupAccount, type Method } from '../lib/auth'
+import { MethodPicker, SecretInput } from '../components/SignInChoice'
+import { secretProblem, setupAccount, type Method } from '../lib/auth'
 
 // First run: your name and how you'd like to sign in. Shown only until it's chosen.
 

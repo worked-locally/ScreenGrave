@@ -5,6 +5,7 @@
 *.local
 data
 dist
+dist-server
 node_modules
 .git
 .gitignore

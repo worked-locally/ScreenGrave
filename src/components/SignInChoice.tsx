@@ -80,10 +80,3 @@ export function SecretInput({ method, value, onChange, placeholder, autoComplete
     />
   )
 }
-
-export const secretProblem = (method: Method, secret: string): string | null =>
-  method === 'pin' && !/^\d{4,8}$/.test(secret)
-    ? 'A PIN is 4 to 8 numbers.'
-    : method === 'password' && secret.length < 8
-      ? 'Use at least 8 characters for a password.'
-      : null

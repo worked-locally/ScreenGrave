@@ -3,14 +3,15 @@ import { createPortal } from 'react-dom'
 import { trailerKey, type Title } from '../lib/tmdb'
 
 export default function TrailerButton({ title }: { title: Title }) {
-  const [key, setKey] = useState<string | null>(null)
+  const id = `${title.type}-${title.id}`
+  const [found, setFound] = useState<{ id: string; key: string | null } | null>(null)
   const [open, setOpen] = useState(false)
+  const key = found?.id === id ? found.key : null
 
   useEffect(() => {
     let cancelled = false
-    setKey(null)
     trailerKey(title.type, title.id)
-      .then((k) => !cancelled && setKey(k))
+      .then((k) => !cancelled && setFound({ id: `${title.type}-${title.id}`, key: k }))
       .catch(() => {})
     return () => {
       cancelled = true
@@ -40,7 +41,7 @@ export default function TrailerButton({ title }: { title: Title }) {
             <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="aspect-video overflow-hidden rounded-2xl bg-black">
                 <iframe
-                  src={`https://www.youtube.com/embed/${key}?autoplay=1&playsinline=1&rel=0`}
+                  src={`https://www.youtube.com/embed/${encodeURIComponent(key)}?autoplay=1&playsinline=1&rel=0`}
                   title={`${title.title} trailer`}
                   allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                   allowFullScreen
@@ -48,7 +49,7 @@ export default function TrailerButton({ title }: { title: Title }) {
                 />
               </div>
               <div className="mt-3 flex justify-between text-sm text-[#8b8392]">
-                <a href={`https://www.youtube.com/watch?v=${key}`} target="_blank" rel="noreferrer">
+                <a href={`https://www.youtube.com/watch?v=${encodeURIComponent(key)}`} target="_blank" rel="noreferrer">
                   Open on YouTube
                 </a>
                 <button onClick={() => setOpen(false)}>Close</button>

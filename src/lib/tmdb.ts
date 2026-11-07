@@ -106,12 +106,41 @@ export async function seasonEpisodes(id: number, season: number): Promise<Episod
   }))
 }
 
+export interface Upcoming {
+  date: string
+  label: string // "S5 · E3", or "S5 · E1–E4" when several come out the same day
+  name: string
+}
+
 export interface Info {
   aired: number // episodes aired so far (shows only)
   ended: boolean // the show is finished or canceled (shows only)
   release: string // release date (movies) or premiere date (shows)
-  next: { date: string; label: string; name: string } | null
+  next: Upcoming | null
+  soon?: Upcoming[] // shows: every episode in the next 4 weeks, one entry per day
   fetchedAt: number
+}
+
+const SOON_DAYS = 28
+
+// the episodes of the upcoming season that air in the next 4 weeks, same-day drops combined
+async function soonEpisodes(id: number, season: number): Promise<Upcoming[]> {
+  const today = new Date().toLocaleDateString('en-CA')
+  const until = new Date(Date.now() + SOON_DAYS * 86_400_000).toLocaleDateString('en-CA')
+  const eps = (await seasonEpisodes(id, season)).filter((e) => e.airDate && e.airDate >= today && e.airDate <= until)
+  const byDay = new Map<string, Episode[]>()
+  for (const e of eps) byDay.set(e.airDate, [...(byDay.get(e.airDate) ?? []), e])
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, list]) => {
+      const first = list[0].number
+      const last = list[list.length - 1].number
+      return {
+        date,
+        label: list.length > 1 ? `S${season} · E${first}–E${last}` : `S${season} · E${first}`,
+        name: list.length > 1 ? `${list.length} episodes` : list[0].name,
+      }
+    })
 }
 
 interface RawEpisode {
@@ -160,13 +189,19 @@ export async function fetchInfo(t: Title): Promise<Info> {
         .reduce((n, s) => n + s.episode_count, 0) + last.episode_number
   }
 
+  const next = nx?.air_date
+    ? { date: nx.air_date, label: `S${nx.season_number} · E${nx.episode_number}`, name: nx.name ?? '' }
+    : null
+  // only shows with an episode coming up soon need the extra lookup
+  const soonish = next && next.date <= new Date(Date.now() + SOON_DAYS * 86_400_000).toLocaleDateString('en-CA')
+  const soon = soonish && nx ? await soonEpisodes(t.id, nx.season_number).catch(() => [next]) : undefined
+
   return {
     aired,
     ended: d.status === 'Ended' || d.status === 'Canceled',
     release: (d.first_air_date as string) || '',
-    next: nx?.air_date
-      ? { date: nx.air_date, label: `S${nx.season_number} · E${nx.episode_number}`, name: nx.name ?? '' }
-      : null,
+    next,
+    soon: soon?.length ? soon : undefined,
     fetchedAt: Date.now(),
   }
 }

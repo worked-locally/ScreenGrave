@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { logout } from '../lib/auth'
+import { ago } from '../lib/dates'
+import { useTapCount } from '../lib/taps'
 import {
   traktConnect,
   traktDevicePoll,
@@ -44,34 +46,46 @@ function Row({
   )
 }
 
-function ago(ms: number) {
-  const min = Math.round((Date.now() - ms) / 60_000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min} min ago`
-  const h = Math.round(min / 60)
-  if (h < 24) return `${h} h ago`
-  return `${Math.round(h / 24)} d ago`
-}
-
 export default function UserMenu({ username, canLogout, onOpenSettings, connectNow }: Props) {
-  const [open, setOpen] = useState(false)
-  const [view, setView] = useState<View>('menu')
-  const [note, setNote] = useState('')
+  // coming back from Trakt's sign-in page leaves ?trakt=connected (or an error) in the address; read it once
+  const [traktReturn] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    const result = params.get('trakt')
+    if (result) {
+      params.delete('trakt')
+      const qs = params.toString()
+      window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''))
+    }
+    return result
+  })
+  const failedReturn = !!traktReturn && traktReturn !== 'connected'
+  const importing = traktReturn === 'connected'
+  const [open, setOpen] = useState(!!connectNow || !!traktReturn)
+  const [view, setView] = useState<View>(connectNow ? 'connect' : importing ? 'busy' : failedReturn ? 'note' : 'menu')
+  const [note, setNote] = useState(
+    importing ? 'Connected to Trakt. Importing your library…' : failedReturn ? "Couldn't connect to Trakt. Please try again." : '',
+  )
   const [trakt, setTrakt] = useState<TraktStatus | null>(null)
   const [copied, setCopied] = useState(false)
   const [device, setDevice] = useState<DeviceCode | null>(null)
-  const [deviceMsg, setDeviceMsg] = useState('')
+  const [deviceMsg, setDeviceMsg] = useState(connectNow ? 'Getting a code from Trakt…' : '')
   const [showRedirect, setShowRedirect] = useState(false)
+  const tapVersion = useTapCount()
 
-  async function startDevice() {
+  // asks Trakt for a sign-in code (the "Getting a code…" message is set by whoever calls this)
+  function fetchCode() {
+    traktDeviceStart()
+      .then((d) => {
+        setDevice(d)
+        setDeviceMsg('')
+      })
+      .catch((e) => setDeviceMsg(e instanceof Error ? e.message : String(e)))
+  }
+
+  function startDevice() {
     setDevice(null)
     setDeviceMsg('Getting a code from Trakt…')
-    try {
-      setDevice(await traktDeviceStart())
-      setDeviceMsg('')
-    } catch (e) {
-      setDeviceMsg(e instanceof Error ? e.message : String(e))
-    }
+    fetchCode()
   }
 
   function refreshTrakt() {
@@ -80,10 +94,15 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
       .catch(() => {})
   }
 
-  async function runSync(intro: string) {
+  function runSync(intro: string) {
     setOpen(true)
     setNote(intro)
     setView('busy')
+    void sync()
+  }
+
+  // the sync itself; the menu is already showing "busy" when this starts
+  async function sync() {
     try {
       const r = await traktSync()
       const changed = r.titles > 0 || r.episodes > 0
@@ -111,31 +130,10 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
     refreshTrakt()
   }, [])
 
-  // onboarding's "Import from Trakt instead"
+  // onboarding's "Import from Trakt instead" opens straight to the code; a successful return from Trakt starts the import
   useEffect(() => {
-    if (!connectNow) return
-    setOpen(true)
-    setShowRedirect(false)
-    setView('connect')
-    void startDevice()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectNow])
-
-  // coming back from Trakt's sign-in page
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const result = params.get('trakt')
-    if (!result) return
-    params.delete('trakt')
-    const qs = params.toString()
-    window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''))
-    if (result === 'connected') {
-      void runSync('Connected to Trakt. Importing your library…')
-    } else {
-      setOpen(true)
-      setNote("Couldn't connect to Trakt. Please try again.")
-      setView('note')
-    }
+    if (connectNow) fetchCode()
+    if (importing) void sync()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -151,7 +149,7 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
       if (status === 'connected') {
         setDevice(null)
         refreshTrakt()
-        void runSync('Connected to Trakt. Importing your library…')
+        runSync('Connected to Trakt. Importing your library…')
         return
       }
       if (status === 'denied' || status === 'expired' || status === 'error') {
@@ -245,7 +243,7 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
                   <Row
                     label="Sync Now"
                     hint={trakt.lastSync ? `Trakt · last synced ${ago(trakt.lastSync)}` : 'Trakt · not synced yet'}
-                    onClick={() => void runSync('Syncing with Trakt…')}
+                    onClick={() => runSync('Syncing with Trakt…')}
                   />
                 ) : (
                   <Row
@@ -262,7 +260,7 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
                         setCopied(false)
                         setShowRedirect(false)
                         go('connect')
-                        void startDevice()
+                        startDevice()
                       }
                     }}
                   />
@@ -332,7 +330,7 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
                         <p className="text-xs leading-relaxed text-[#8b8392]">{deviceMsg}</p>
                         {deviceMsg && !deviceMsg.startsWith('Getting') && (
                           <button
-                            onClick={() => void startDevice()}
+                            onClick={() => startDevice()}
                             className="mt-2 text-xs"
                             style={{ color: 'var(--accent)' }}
                           >
@@ -392,7 +390,7 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
                       <button
                         onClick={() => {
                           setShowRedirect(false)
-                          void startDevice()
+                          startDevice()
                         }}
                         className="text-sm text-[#8b8392]"
                       >
@@ -414,7 +412,10 @@ export default function UserMenu({ username, canLogout, onOpenSettings, connectN
             {view === 'about' && (
               <div className="p-3">
                 <p className="text-sm font-semibold">
-                  ScreenGrave <span className="text-xs font-normal text-[#8b8392]">v{__APP_VERSION__}</span>
+                  ScreenGrave{' '}
+                  <span onClick={tapVersion} className="select-none text-xs font-normal text-[#8b8392]">
+                    v{__APP_VERSION__}
+                  </span>
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-[#8b8392]">
                   A clean tracker for the shows and movies you love.

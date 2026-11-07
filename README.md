@@ -1,12 +1,22 @@
-# ScreenGrave
+<p align="center">
+  <img src="public/pwa-512x512.png" alt="ScreenGrave logo" width="112" />
+</p>
 
-> Track the shows and movies you love, in a clean, cinema-dark interface.
+<h1 align="center">ScreenGrave</h1>
 
-**Version 0.8.0** · React + TypeScript · Node + SQLite · Docker · Installable PWA
+<p align="center"><em>Track the shows and movies you love, in a clean, cinema-dark interface.</em></p>
+
+<p align="center"><strong>Version 0.9.0</strong> · React + TypeScript · Node + SQLite · Docker · Installable PWA</p>
+
+<p align="center">
+  <img src="docs/screenshots/watchlist.png" alt="Watchlist" width="30%" />
+  <img src="docs/screenshots/upcoming.png" alt="Upcoming" width="30%" />
+  <img src="docs/screenshots/discover.png" alt="Discover, For You" width="30%" />
+</p>
 
 ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is inspired by the clean look of Hobi and built as a calmer alternative to Trakt's busy interface. It runs on your own server in Docker, keeps your library in a small SQLite database, and can sync both ways with Trakt. Posters, trailers, genres, ratings, and episode data come from [TMDB](https://www.themoviedb.org/).
 
-**Contents:** [Features](#features) · [Upcoming and in development](#upcoming-and-in-development) · [Tech stack](#tech-stack) · [Getting API keys](#getting-api-keys) · [Install with Docker](#install-with-docker) · [Development](#development) · [Project layout](#project-layout) · [Changelog](#changelog) · [Credits](#credits)
+**Contents:** [Features](#features) · [Upcoming and in development](#upcoming-and-in-development) · [Security and privacy](#security-and-privacy) · [Tech stack](#tech-stack) · [Getting API keys](#getting-api-keys) · [Install with Docker](#install-with-docker) · [Development](#development) · [Project layout](#project-layout) · [Changelog](#changelog) · [Credits](#credits)
 
 ---
 
@@ -27,6 +37,7 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 ### Upcoming
 - A timeline of new episodes and movie releases, grouped by day (Today, Tomorrow, weekday, date). Dates in another year show the year.
+- Shows every episode coming up in the next **2 weeks**, with a **Show 4 weeks** button when there's more. Episodes released on the same day are combined into one row ("S5 · E1–E4"). Shows further out list their next episode.
 - Follows your Watchlist plus caught-up shows in Watched, so their next episodes still appear.
 
 ### First-run walkthrough
@@ -41,17 +52,18 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 - **Browse** by Movies or Series, by **streaming service** (Netflix, Prime Video, Apple TV+, Disney+, and more), and by **genre**. Filters combine, for example "Popular on Hulu · Comedy".
 - **Popular in your country:** the flag tile shows what's popular to stream where you live.
 - Shows 6 rows at a time with a **Load more** button.
-- Floating **search** button (hidden while the search bar is on screen), plus a **scroll-up** button at the bottom of the page that jumps back to the browse filters.
+- Floating **search** button (hidden while the search bar is on screen), plus a **scroll-up** button once you're a few rows down, which jumps back to the For You and Browse tabs.
 
 ### Watched
 - Search, plus sorting by Newest, Oldest, A-Z, Top rated, or Recently watched.
 - Year headers that stay pinned while you scroll, and a floating search button.
 
 ### Detail sheet
-- Backdrop, poster, overview, genres, and an audience rating chip.
+- Backdrop, poster, overview (long ones fold to 4 lines with **Read more**), genres, and an audience rating chip.
 - **Trailer** button that plays inside the app.
 - **Watchlist / Watched** toggles. They show "(Added)" when active, and a short "Removed from..." message when you tap again.
 - Season and episode tracker. It opens on the season you're currently on, with "Mark season watched".
+- Finishing a season, or catching up on a whole show, gets a small celebration.
 - Marking a show **Watched** checks off every aired episode in every season.
 - Close with the X button or by tapping the blurred background. The page behind stays put.
 
@@ -78,9 +90,13 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 ### Look and feel
 - "After-hours cinema" theme: plum-black surfaces, ember-amber accent, teal for done states.
 - Popcorn-bucket tombstone app icon for the browser tab and the iPhone home screen.
-- Icon tab bar, page titles with matching icons, tap ripple and sparkle, slide-up sheets, film-themed section dividers.
-- Respects the "reduce motion" setting.
+- Icon tab bar with a soft amber glow that slides to the tab you're on, page titles with matching icons, tap ripple and sparkle, slide-up sheets, film-themed section dividers.
+- Soft poster-shaped placeholders while things load.
+- Respects the "reduce motion" setting, and shows a matching amber focus ring for people who use a keyboard.
 - Installed copies update themselves: after a new version is deployed, the app notices and reloads once.
+- Light and quick: the first screen loads on its own, and the rest of the app follows quietly in the background.
+
+*ScreenGrave hides a few surprises. Try quoting your favorite movies in the Discover search.*
 
 ---
 
@@ -88,21 +104,30 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 | Feature | Status |
 | --- | --- |
-| Sign in with Face ID or Touch ID (passkeys) | Upcoming |
-| Show more than one upcoming episode per show | Upcoming |
-| Loading skeletons and a sliding tab-bar indicator | Upcoming |
-| Celebration effect when you finish a season or show | Upcoming |
-| Prebuilt Docker images on GitHub (no local build needed) | Upcoming |
+| Prebuilt Docker images on GitHub (install and update with `docker compose pull`) | Upcoming (1.0) |
 | Google (Gmail) sign-in | Upcoming |
 | Multi-user accounts | Upcoming |
+| Sign in with Face ID or Touch ID (passkeys, HTTPS installs only) | Maybe later, if requested |
+
+---
+
+## Security and privacy
+
+- **No analytics, tracking, or telemetry.** Your library stays in one SQLite file on your own server.
+- PINs and passwords are stored only as scrambled fingerprints. Sign-in pauses after repeated wrong guesses, and changing your PIN signs out other devices.
+- Your TMDB key and Trakt login never reach the browser.
+- Other websites can't make changes on your behalf, and pages can't be embedded or loaded with outside scripts.
+- The Docker image runs as a regular user and contains only Node.js, the built app, and one server file.
+
+**Details:** [docs/security.md](docs/security.md) covers what's stored, what leaves your server, how sign-in is protected, and advice for running ScreenGrave on the internet.
 
 ---
 
 ## Tech stack
 
 - **Web app:** Vite, React, TypeScript, Tailwind CSS v4, `vite-plugin-pwa`, Inter font
-- **Server:** Node.js 24 with [Hono](https://hono.dev/), and Node's built-in SQLite (`node:sqlite`)
-- **Packaging:** Docker image (Node 24 slim) with Docker Compose
+- **Server:** Node.js 24 with [Hono](https://hono.dev/), and Node's built-in SQLite (`node:sqlite`), bundled into a single file with esbuild for production
+- **Packaging:** Docker image (Node 24 Alpine, no `node_modules` at runtime) with Docker Compose
 - **Data:** TMDB API for titles and artwork, Trakt API for sync
 - Your library lives in `data/screengrave.db` on the server, shared by every device you sign in from
 
@@ -173,8 +198,9 @@ Then:
 
 ```powershell
 npm run dev       # web app at http://localhost:5173, plus the server on 8787
-npm run build     # type check and production build in /dist
-npm start         # serves the built app and API at http://localhost:8787
+npm run build     # type check, then build the app into /dist and the server into /dist-server
+npm start         # runs the built version at http://localhost:8787 (run npm run build first)
+npm run lint      # code checks
 ```
 
 > `.env.local`, `.env`, and `data/` are gitignored, so never commit them. `TMDB_TOKEN`, `TRAKT_CLIENT_ID`, and the password stay on the server and are never sent to the browser.
@@ -186,14 +212,15 @@ The version number lives only in `package.json`. The app and server both read it
 ## Project layout
 
 ```
-server/         index.ts (server), api.ts (library), auth.ts (sign-in), settings.ts,
+server/         index.ts (server), api.ts (library), auth.ts (sign-in), security.ts, settings.ts,
                 trakt.ts (two-way Trakt sync), notify.ts (notifications), tmdb.ts, db.ts (SQLite)
+scripts/        build-server.mjs (bundles the server for production)
 src/
   components/   Poster, TabBar, DetailSheet, EpisodeTracker, Carousel3D, UserMenu, SettingsSheet, ...
-  screens/      Watchlist, Upcoming, Discover, Watched, Login, Setup
-  lib/          api.ts, auth.ts, trakt.ts, tmdb.ts, library.ts, settings.ts, freshness.ts, ...
+  screens/      Watchlist, Upcoming, Discover, Watched, Login, Setup, Onboarding
+  lib/          api.ts, auth.ts, trakt.ts, tmdb.ts, library.ts, settings.ts, foryou.ts, freshness.ts, ...
 public/         app icons
-docs/           install guide
+docs/           install guide, security and privacy, screenshots
 data/           screengrave.db (created on first run, local development)
 Dockerfile, docker-compose.yml, .env.example
 ```
@@ -203,6 +230,38 @@ Dockerfile, docker-compose.yml, .env.example
 ## Changelog
 
 <details open>
+<summary><strong>0.9.0 (Day 7)</strong></summary>
+
+**New**
+- **Upcoming** shows every episode in the next 2 weeks, with **Show 4 weeks** when there's more. Same-day drops are combined into one row.
+- **Celebration** when you finish a season or catch up on a show.
+- **Loading placeholders** instead of "Loading…" text.
+- **Tab bar glow:** a soft amber light slides to the tab you're on.
+- **Detail sheet:** long overviews fold to 4 lines with **Read more**, and the close button is bigger and easier to tap.
+- A few small surprises.
+
+**Lighter and faster**
+- The server is pre-built into one file, so the Docker image no longer carries `node_modules` or a TypeScript loader, and it now uses Node's smaller Alpine base. In testing, the server used about half the memory.
+- The first screen loads on its own (main script 99 KB → 77 KB compressed), and the other screens follow in the background.
+- Fonts trimmed to the Latin sets the app uses (218 KB → 133 KB).
+- Tidier code: duplicate helpers merged, the old browser-storage migration removed, and the code checks now pass with no findings.
+
+**Security**
+- Changes are only accepted from ScreenGrave's own pages, not from other websites.
+- Browser protections on every page (Content Security Policy, no embedding in other sites, and more).
+- An extra limit on wrong sign-in tries across all devices combined.
+- Requests over 2 MB are refused, and outside services time out instead of hanging.
+- Signed-in data is never cached. Expired sessions are cleaned up hourly.
+- New page: [docs/security.md](docs/security.md).
+
+**Fixes**
+- Discover: the scroll-up button appears after the 4th row instead of only at the very bottom.
+- No more plain white outline after clicking a button on a computer.
+- For You no longer shows loading shapes forever when TMDB can't be reached.
+
+</details>
+
+<details>
 <summary><strong>0.8.0 (Day 6, part 2)</strong></summary>
 
 **New**

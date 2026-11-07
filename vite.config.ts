@@ -17,7 +17,8 @@ export default defineConfig({
   server: {
     host: true,
     proxy: {
-      '/api': 'http://localhost:8787',
+      // keep the browser's own address on proxied requests, so the server's same-site check sees one site
+      '/api': { target: 'http://localhost:8787', changeOrigin: false },
     },
   },
   plugins: [

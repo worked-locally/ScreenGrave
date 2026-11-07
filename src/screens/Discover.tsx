@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import FloatingSearch from '../components/FloatingSearch'
 import ForYou from '../components/ForYou'
 import PosterGrid from '../components/PosterGrid'
 import ScreenTitle from '../components/ScreenTitle'
 import ScrollRow from '../components/ScrollRow'
 import type { Library } from '../lib/library'
+import { presetFor } from '../lib/presets'
+import { pastRow } from '../lib/scroll'
 import { REGIONS } from '../lib/settings'
 import {
   discover,
@@ -100,6 +102,7 @@ interface Props {
 export default function Discover({ library, favoriteGenres, onSelect, onOpenSettings }: Props) {
   const [mode, setModeState] = useState<Mode>(savedMode)
   const modeRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const setMode = (m: Mode) => {
     setModeState(m)
     try {
@@ -133,6 +136,20 @@ export default function Discover({ library, favoriteGenres, onSelect, onOpenSett
 
   const key = `${type}:${filter.genre ?? 0}:${filter.provider ?? 0}`
   const loading = browse.key !== key
+
+  // a few search terms come with their own little scene
+  const lastPreset = useRef('')
+  useEffect(() => {
+    const preset = presetFor(query)
+    const n = query.toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (!preset) {
+      lastPreset.current = ''
+      return
+    }
+    if (lastPreset.current === n) return
+    lastPreset.current = n
+    void import('../lib/motion').then((m) => m.play(preset, inputRef.current))
+  }, [query])
 
   useEffect(() => {
     let cancelled = false
@@ -226,6 +243,10 @@ export default function Discover({ library, favoriteGenres, onSelect, onOpenSett
     window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
   }
 
+  // the up arrow shows once you're past the 4th row of posters (Browse) or the 2nd row of picks (For You)
+  const upAfter = useCallback(() => pastRow(contentRef.current, mode === 'browse' ? 4 : 2), [mode])
+  const toTop = useCallback(() => window.scrollTo({ top: 0, behavior: 'smooth' }), [])
+
   const suggestions = q ? found.slice(0, 6) : []
   const showDropdown = open && suggestions.length > 0
 
@@ -241,7 +262,7 @@ export default function Discover({ library, favoriteGenres, onSelect, onOpenSett
   const heading = `${where}${genre ? ` · ${genre.name}` : ''} · ${type === 'movie' ? 'Movies' : 'Series'}`
 
   return (
-    <div>
+    <div data-stage>
       <ScreenTitle title="Discover" icon="discover" />
 
       <div className="relative mb-5">
@@ -316,6 +337,7 @@ export default function Discover({ library, favoriteGenres, onSelect, onOpenSett
         <PosterGrid items={found.slice(0, ROWS_STEP * PER_ROW)} onSelect={onSelect} empty="No results." />
       ) : (
         <>
+          <div ref={contentRef}>
           <div ref={modeRef} className="mb-5 flex gap-6" role="tablist">
             {(['foryou', 'browse'] as const).map((m) => (
               <button
@@ -400,7 +422,7 @@ export default function Discover({ library, favoriteGenres, onSelect, onOpenSett
           <p className="mb-3 text-xs uppercase tracking-widest text-[#8b8392]">{heading}</p>
 
           <div className={loading ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
-            <PosterGrid items={shown} onSelect={onSelect} empty={loading ? 'Loading…' : 'No results.'} />
+            <PosterGrid items={shown} onSelect={onSelect} loading={loading} empty="No results." />
           </div>
 
           {canMore && (
@@ -414,10 +436,15 @@ export default function Discover({ library, favoriteGenres, onSelect, onOpenSett
           )}
         </>
           )}
+          </div>
         </>
       )}
 
-      <FloatingSearch target={inputRef} onUp={q ? undefined : mode === 'browse' ? toBrowse : () => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+      <FloatingSearch
+        target={inputRef}
+        onUp={q ? undefined : mode === 'browse' ? toBrowse : toTop}
+        upAfter={q ? undefined : upAfter}
+      />
     </div>
   )
 }

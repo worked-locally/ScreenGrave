@@ -13,3 +13,7 @@ node_modules
 *.log
 Next focus.txt
 logo-ref*.png
+# not needed to build the app
+.github
+docs
+README.md

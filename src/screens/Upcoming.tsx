@@ -12,6 +12,30 @@ interface Props {
 
 const RANGE_KEY = 'screengrave:upcoming-weeks'
 
+// shown while show details are being refreshed; one is picked at random each time
+const UPDATING = [
+  'Updating titles…',
+  'Checking the schedule…',
+  'Asking the projectionist…',
+  'Refreshing the marquee…',
+  'Rewinding the tapes…',
+  'Counting new episodes…',
+  'Restocking the popcorn…',
+  'Watching the trailers first…',
+  'Waiting in line for popcorn…',
+  'Standing in line for a soda…',
+  'Waiting in line for the restroom…',
+  'One quick restroom break before the movie…',
+  'Waiting for showtime…',
+  "I'll be back… with your episodes",
+  'Hold on to your butts…',
+  'Patience you must have…',
+  'Just keep swimming…',
+  'Wait for it…',
+  'F*** Microsoft…',
+  'Installing Windows updates… 1 of 247',
+]
+
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toLocaleDateString('en-CA')
 
 function savedWeeks(): 2 | 4 {
@@ -47,6 +71,7 @@ function entriesFor(i: Info | undefined, today: string, until: string): Item[] {
 
 export default function Upcoming({ library, info, onSelect }: Props) {
   const [weeks, setWeeksState] = useState<2 | 4>(savedWeeks)
+  const [updating] = useState(() => UPDATING[Math.floor(Math.random() * UPDATING.length)])
   const setWeeks = (w: 2 | 4) => {
     setWeeksState(w)
     try {
@@ -84,7 +109,7 @@ export default function Upcoming({ library, info, onSelect }: Props) {
     <div>
       <ScreenTitle title="Upcoming" icon="upcoming" />
 
-      {loading > 0 && <p className="mb-4 text-xs text-[#8b8392]">Checking {loading} titles…</p>}
+      {loading > 0 && <p className="mb-4 text-xs text-[#8b8392]">{updating}</p>}
 
       {groups.length === 0 && loading === 0 && (
         <p className="mt-16 text-center text-sm text-[#8b8392]">

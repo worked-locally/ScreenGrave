@@ -1,7 +1,12 @@
+name: screengrave
+
 services:
   screengrave:
+    # The ready-made image, built by GitHub for each release.
+    # Use :latest for every update, or pin a version, for example :1 or :1.0.0.
+    image: ghcr.io/worked-locally/screengrave:latest
+    # Building from the source code instead? Keep this line and run: docker compose up -d --build
     build: .
-    image: screengrave:local
     container_name: screengrave
     restart: unless-stopped
     init: true

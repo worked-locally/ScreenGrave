@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useBodyLock } from '../lib/bodyLock'
 import type { useEpisodes } from '../lib/episodes'
 import type { ListName } from '../lib/library'
+import { useShowStateLookup } from '../lib/showstate'
 import { img, titleGenres, type Title } from '../lib/tmdb'
 import EpisodeTracker from './EpisodeTracker'
 import TrailerButton from './TrailerButton'
@@ -13,6 +14,37 @@ interface Props {
   onSet: (list: ListName) => void
   onRemove: () => void
   ep: ReturnType<typeof useEpisodes>
+}
+
+const shortDate = (d: string) => {
+  const date = new Date(`${d}T00:00:00`)
+  const sameYear = date.getFullYear() === new Date().getFullYear()
+  return date.toLocaleDateString(undefined, { weekday: sameYear ? 'short' : undefined, month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
+}
+
+// one line under the title: is there more coming, and when?
+function ShowStatus({ title }: { title: Title }) {
+  const s = useShowStateLookup(title)
+  if (!s) return null
+  const today = new Date().toLocaleDateString('en-CA')
+  let text: string
+  let dot: string
+  if (s.state === 'ended' || s.state === 'canceled') {
+    text = s.state === 'ended' ? 'Ended' : 'Canceled'
+    dot = '#6b6473'
+  } else if (s.state === 'soon') {
+    text = s.release && s.release > today ? `Coming soon · ${shortDate(s.release)}` : 'Coming soon'
+    dot = '#cdc6bd'
+  } else {
+    text = s.next && s.next >= today ? `Ongoing · next episode ${shortDate(s.next)}` : 'Ongoing · between seasons'
+    dot = 'var(--accent)'
+  }
+  return (
+    <p className="mt-1 flex items-center gap-1.5 text-xs text-[#cdc6bd]">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: dot }} aria-hidden="true" />
+      {text}
+    </p>
+  )
 }
 
 // the overview, cut to 4 lines with "Read more" when it's long
@@ -104,6 +136,9 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
     <div className="fixed inset-0 z-20 flex items-end justify-center">
       <div className="anim-fade touch-none absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title.title}
         className="anim-sheet relative max-h-[88%] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl bg-[#16131a]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}
       >
@@ -120,7 +155,7 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
         </div>
         
         {backdrop && (
-          <div className="relative h-40 overflow-hidden rounded-t-3xl">
+          <div className="relative h-32 overflow-hidden rounded-t-3xl">
             <img src={backdrop} alt="" className="h-full w-full object-cover opacity-70" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#16131a] to-transparent" />
           </div>
@@ -131,7 +166,7 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
               <img
                 src={img(title.poster) ?? ''}
                 alt={title.title}
-                className={`w-24 shrink-0 rounded-xl ${backdrop ? '-mt-14' : ''}`}
+                className={`relative z-10 aspect-[2/3] w-24 shrink-0 rounded-xl object-cover shadow-lg shadow-black/50 ring-1 ring-white/10 ${backdrop ? '-mt-14' : ''}`}
               />
             )}
             <div className="min-w-0">
@@ -140,6 +175,7 @@ export default function DetailSheet({ title, current, onClose, onSet, onRemove, 
                 {title.type === 'tv' ? 'Series' : 'Movie'}
                 {title.year && ` · ${title.year}`}
               </p>
+              {title.type === 'tv' && <ShowStatus title={title} />}
             </div>
           </div>
 

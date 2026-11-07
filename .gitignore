@@ -25,6 +25,7 @@ dist-ssr
 *.sw?
 data/
 Next focus.txt
+logo-ref..png
 
 # Docker settings file on the server (holds secrets)
 .env

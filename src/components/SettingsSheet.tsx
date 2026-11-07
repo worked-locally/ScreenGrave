@@ -325,6 +325,17 @@ export default function SettingsSheet({ prefs, username, passwordSource, method,
           <div onClick={tapVersion} className="select-none">
             <Row label="ScreenGrave" hint={`Version ${__APP_VERSION__}`} />
           </div>
+          <Row label="Source code" hint="Free and open source under the GNU AGPL-3.0">
+            <a
+              href="https://github.com/worked-locally/ScreenGrave"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 text-sm"
+              style={{ color: 'var(--accent)' }}
+            >
+              GitHub
+            </a>
+          </Row>
           <div className="px-4 py-3.5 text-xs leading-relaxed text-[#8b8392]">
             Data and images from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.
           </div>

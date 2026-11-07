@@ -58,6 +58,28 @@ export default function FloatingSearch({ target, onUp, upAfter }: Props) {
     },
   })
 
+  // The search button works on finger lift instead: iPhone only opens the keyboard when the field is
+  // focused while the tap is finishing, and holding off on touch-down stops the button from taking focus back.
+  const tapToType = (fn: () => void) => ({
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (e.pointerType !== 'mouse') e.preventDefault()
+    },
+    onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (e.pointerType === 'mouse') return
+      e.preventDefault()
+      e.currentTarget.dataset.handled = '1'
+      fn()
+    },
+    onMouseDown: (e: MouseEvent<HTMLButtonElement>) => e.preventDefault(), // keep focus where fn puts it
+    onClick: (e: MouseEvent<HTMLButtonElement>) => {
+      if (e.currentTarget.dataset.handled) {
+        delete e.currentTarget.dataset.handled
+        return
+      }
+      fn()
+    },
+  })
+
   function focusSearch() {
     target.current?.focus({ preventScroll: true })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -82,7 +104,7 @@ export default function FloatingSearch({ target, onUp, upAfter }: Props) {
         )}
         {showSearch && (
           <button
-            {...tap(focusSearch)}
+            {...tapToType(focusSearch)}
             aria-label="Search"
             className="anim-fade pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg shadow-black/50 transition-transform active:scale-90"
             style={{ background: 'var(--accent)', color: '#1a1008' }}

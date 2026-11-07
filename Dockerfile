@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # ---------- build: the web app and a single-file server ----------
-FROM node:24-alpine AS build
+# Runs once on the build machine's own platform: the result is plain JavaScript that works everywhere.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -17,6 +18,7 @@ WORKDIR /app
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
+COPY --from=build /app/LICENSE ./LICENSE
 
 # the database lives here; mount a volume on it so your data survives updates
 RUN mkdir -p /app/data && chown node:node /app/data

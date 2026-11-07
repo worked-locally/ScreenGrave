@@ -2,7 +2,7 @@
 
 This guide gets ScreenGrave running on a server on your home network with Docker. You don't need a domain name or HTTPS for this. Those are an optional upgrade, covered in a later guide.
 
-**Contents:** [What you need](#what-you-need) · [1. Get the code](#1-get-the-code) · [2. Settings](#2-settings) · [3. Start it](#3-start-it) · [4. Open it](#4-open-it) · [5. Connect Trakt](#5-connect-trakt-optional) · [6. Notifications](#6-notifications-optional) · [Updating](#updating) · [Backups](#backups) · [Useful commands](#useful-commands) · [Troubleshooting](#troubleshooting)
+**Contents:** [What you need](#what-you-need) · [1. Get ScreenGrave](#1-get-screengrave) · [2. Settings](#2-settings) · [3. Start it](#3-start-it) · [4. Open it](#4-open-it) · [5. Connect Trakt](#5-connect-trakt-optional) · [6. Notifications](#6-notifications-optional) · [Updating](#updating) · [Backups](#backups) · [Useful commands](#useful-commands) · [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -13,7 +13,7 @@ This guide gets ScreenGrave running on a server on your home network with Docker
   docker version
   docker compose version
   ```
-- **Git**, to download the code.
+- **Git**, only if you'd rather build ScreenGrave from its source code (option B below).
 - A free **TMDB API Read Access Token** (required). See [Getting API keys](../README.md#getting-api-keys).
 - A **Trakt Client ID**, only if you want Trakt sync.
 
@@ -21,7 +21,19 @@ A small VM is plenty: 2 CPU cores, 2 GB of RAM, and 20 GB of disk.
 
 ---
 
-## 1. Get the code
+## 1. Get ScreenGrave
+
+### Option A: the ready-made image (recommended)
+
+GitHub builds a ready-to-run image for every release, for regular PCs and servers (amd64) and ARM devices like a Raspberry Pi (arm64). You only need two small files:
+
+```bash
+mkdir screengrave && cd screengrave
+curl -fsSLO https://raw.githubusercontent.com/worked-locally/ScreenGrave/master/docker-compose.yml
+curl -fsSL -o .env.example https://raw.githubusercontent.com/worked-locally/ScreenGrave/master/.env.example
+```
+
+### Option B: build it from the source code
 
 ```bash
 git clone https://github.com/worked-locally/ScreenGrave.git
@@ -50,11 +62,20 @@ chmod 600 .env
 
 ## 3. Start it
 
+**Option A (ready-made image):**
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+**Option B (from source):**
+
 ```bash
 docker compose up -d --build
 ```
 
-The first build takes a few minutes. Then check that it's running:
+The first build takes a few minutes. Either way, check that it's running:
 
 ```bash
 docker compose ps
@@ -136,6 +157,16 @@ In **Settings → Notifications**, pick a service, fill in its fields, choose a 
 
 ## Updating
 
+**Option A (ready-made image):**
+
+```bash
+cd screengrave
+docker compose pull
+docker compose up -d
+```
+
+**Option B (from source):**
+
 ```bash
 cd ScreenGrave
 git pull
@@ -143,6 +174,8 @@ docker compose up -d --build
 ```
 
 Your library is stored in a Docker volume, so updates never touch it.
+
+> **Staying on one version:** the compose file uses the `latest` image, so every `pull` brings the newest release. To stay on a version until you choose to move, change `latest` to a version number in `docker-compose.yml`: `:1` follows all 1.x updates, and `:1.0.0` stays exactly there.
 
 ## Backups
 
@@ -164,7 +197,7 @@ docker run --rm -v screengrave_screengrave-data:/data -v "$PWD":/backup alpine \
 docker compose start
 ```
 
-> The volume name starts with the project folder's name. If you cloned into a folder other than `ScreenGrave`, run `docker volume ls` to find it.
+> The volume is always named `screengrave_screengrave-data`, whatever your folder is called. `docker volume ls` lists it.
 
 ## Useful commands
 

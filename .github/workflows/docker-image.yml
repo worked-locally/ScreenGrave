@@ -1,0 +1,70 @@
+# Builds the ScreenGrave Docker image and publishes it to GitHub's container registry.
+#
+# Runs when you push a version tag (for example v1.0.0), or by hand from the Actions tab.
+# A tag like v1.2.3 publishes these image tags:  1.2.3, 1.2, 1, and latest.
+# Each image works on regular PCs and servers (amd64) and on ARM devices like a Raspberry Pi (arm64).
+
+name: Docker image
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write # to publish to ghcr.io
+
+concurrency:
+  group: docker-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/worked-locally/screengrave
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v7
+
+      - name: Set up ARM emulation
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to GitHub's container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch
+          labels: |
+            org.opencontainers.image.title=ScreenGrave
+            org.opencontainers.image.description=A calm, self-hosted tracker for the shows and movies you love
+            org.opencontainers.image.licenses=AGPL-3.0-only
+
+      - name: Build and publish
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

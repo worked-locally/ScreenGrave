@@ -6,17 +6,27 @@
 
 <p align="center"><em>Track the shows and movies you love, in a clean, cinema-dark interface.</em></p>
 
-<p align="center"><strong>Version 0.9.0</strong> · React + TypeScript · Node + SQLite · Docker · Installable PWA</p>
+<p align="center"><strong>Version 1.0.0</strong> · React + TypeScript · Node + SQLite · Docker · Installable PWA</p>
 
 <p align="center">
-  <img src="docs/screenshots/watchlist.png" alt="Watchlist" width="30%" />
-  <img src="docs/screenshots/upcoming.png" alt="Upcoming" width="30%" />
-  <img src="docs/screenshots/discover.png" alt="Discover, For You" width="30%" />
+  <img src="docs/screenshots/watchlist.png" alt="Watchlist" width="19%" />
+  <img src="docs/screenshots/detail.png" alt="Show details" width="19%" />
+  <img src="docs/screenshots/upcoming.png" alt="Upcoming" width="19%" />
+  <img src="docs/screenshots/discover.png" alt="Discover, For You" width="19%" />
+  <img src="docs/screenshots/watched.png" alt="Watched" width="19%" />
 </p>
 
 ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is inspired by the clean look of Hobi and built as a calmer alternative to Trakt's busy interface. It runs on your own server in Docker, keeps your library in a small SQLite database, and can sync both ways with Trakt. Posters, trailers, genres, ratings, and episode data come from [TMDB](https://www.themoviedb.org/).
 
-**Contents:** [Features](#features) · [Upcoming and in development](#upcoming-and-in-development) · [Security and privacy](#security-and-privacy) · [Tech stack](#tech-stack) · [Getting API keys](#getting-api-keys) · [Install with Docker](#install-with-docker) · [Development](#development) · [Project layout](#project-layout) · [Changelog](#changelog) · [Credits](#credits)
+**Contents:** [How it works](#how-it-works) · [Features](#features) · [Upcoming and in development](#upcoming-and-in-development) · [Security and privacy](#security-and-privacy) · [Tech stack](#tech-stack) · [Getting API keys](#getting-api-keys) · [Install with Docker](#install-with-docker) · [Development](#development) · [Project layout](#project-layout) · [Changelog](#changelog) · [Credits](#credits) · [License](#license)
+
+---
+
+## How it works
+
+![ScreenGrave runs on your server. Your phone or computer talks to it, it looks up movie data from TMDB, and it can optionally sync with Trakt and send notifications. Your library is saved on your server.](docs/images/how-it-works.png)
+
+Your phone or computer opens ScreenGrave from **your own server**, where your whole library is saved in one small database file. Movie and show info comes from TMDB, and Trakt sync and daily notifications are optional. **More detail:** [docs/how-it-works.md](docs/how-it-works.md).
 
 ---
 
@@ -104,7 +114,6 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 | Feature | Status |
 | --- | --- |
-| Prebuilt Docker images on GitHub (install and update with `docker compose pull`) | Upcoming (1.0) |
 | Google (Gmail) sign-in | Upcoming |
 | Multi-user accounts | Upcoming |
 | Sign in with Face ID or Touch ID (passkeys, HTTPS installs only) | Maybe later, if requested |
@@ -127,7 +136,7 @@ ScreenGrave is a minimal, mobile-first tracker for TV shows and movies. It is in
 
 - **Web app:** Vite, React, TypeScript, Tailwind CSS v4, `vite-plugin-pwa`, Inter font
 - **Server:** Node.js 24 with [Hono](https://hono.dev/), and Node's built-in SQLite (`node:sqlite`), bundled into a single file with esbuild for production
-- **Packaging:** Docker image (Node 24 Alpine, no `node_modules` at runtime) with Docker Compose
+- **Packaging:** Docker image (Node 24 Alpine, no `node_modules` at runtime) with Docker Compose, built for amd64 and arm64 by GitHub Actions and published to GitHub's container registry
 - **Data:** TMDB API for titles and artwork, Trakt API for sync
 - Your library lives in `data/screengrave.db` on the server, shared by every device you sign in from
 
@@ -163,11 +172,14 @@ That's it. ScreenGrave signs in to Trakt with a short code, so you don't need to
 The quickest way to run ScreenGrave is on a Linux server on your home network:
 
 ```bash
-git clone https://github.com/worked-locally/ScreenGrave.git
-cd ScreenGrave
-cp .env.example .env     # then fill in TMDB_TOKEN, and optionally TRAKT_CLIENT_ID
-docker compose up -d --build
+mkdir screengrave && cd screengrave
+curl -fsSLO https://raw.githubusercontent.com/worked-locally/ScreenGrave/master/docker-compose.yml
+curl -fsSL -o .env https://raw.githubusercontent.com/worked-locally/ScreenGrave/master/.env.example
+nano .env                # fill in TMDB_TOKEN, and optionally TRAKT_CLIENT_ID
+docker compose pull && docker compose up -d
 ```
+
+The image is built by GitHub for every release, for both amd64 and arm64 (Raspberry Pi included). Prefer building it yourself? `git clone` the repo and run `docker compose up -d --build` instead.
 
 Then open `http://<server-ip>:8787` on any device on your network and choose how to sign in. Do this right away, since the first person to open it gets to choose.
 
@@ -215,12 +227,13 @@ The version number lives only in `package.json`. The app and server both read it
 server/         index.ts (server), api.ts (library), auth.ts (sign-in), security.ts, settings.ts,
                 trakt.ts (two-way Trakt sync), notify.ts (notifications), tmdb.ts, db.ts (SQLite)
 scripts/        build-server.mjs (bundles the server for production)
+.github/        workflows/docker-image.yml (builds and publishes the Docker image for each release)
 src/
   components/   Poster, TabBar, DetailSheet, EpisodeTracker, Carousel3D, UserMenu, SettingsSheet, ...
   screens/      Watchlist, Upcoming, Discover, Watched, Login, Setup, Onboarding
   lib/          api.ts, auth.ts, trakt.ts, tmdb.ts, library.ts, settings.ts, foryou.ts, freshness.ts, ...
 public/         app icons
-docs/           install guide, security and privacy, screenshots
+docs/           install guide, how it works, security and privacy, images and screenshots
 data/           screengrave.db (created on first run, local development)
 Dockerfile, docker-compose.yml, .env.example
 ```
@@ -230,6 +243,31 @@ Dockerfile, docker-compose.yml, .env.example
 ## Changelog
 
 <details open>
+<summary><strong>1.0.0 (Day 7, part 2): first public release</strong></summary>
+
+**New**
+- **Ended and Canceled labels** on the posters of shows that have finished, in the top-left corner.
+- **Show status** in the detail sheet: *Ongoing · next episode Wed, Nov 11*, *Ongoing · between seasons*, *Coming soon*, *Ended*, or *Canceled*.
+- **Upcoming** shows a different light-hearted line while it refreshes your shows.
+- **Ready-made Docker images**, built by GitHub for every release, for both amd64 and arm64 (Raspberry Pi included). Install and update with `docker compose pull`, with no git or build needed.
+- **Open source** under the GNU AGPL-3.0, with a **Source code** link in **Settings → About**.
+
+**Docs**
+- New [How it works](docs/how-it-works.md) page, with a brief diagram in this README and a detailed one on the page.
+- Install guide: the ready-made image is now the main way to install, building from source is the alternative, and there are notes on staying on one version.
+
+**Fixes**
+- On iPhone, tapping the floating search button now brings up the keyboard right away.
+- The small poster in the detail sheet no longer gets cut off by the banner, and the banner is a bit shorter.
+
+**Small things**
+- The detail sheet is announced properly to screen readers like VoiceOver.
+- The data volume always has the same name, whatever folder you install into.
+- New screenshots of all five screens at the top of this page.
+
+</details>
+
+<details>
 <summary><strong>0.9.0 (Day 7)</strong></summary>
 
 **New**
@@ -413,3 +451,13 @@ Includes 0.6: ScreenGrave now runs on a home server over HTTPS behind a reverse 
 ## Credits
 
 Data and images provided by TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Trakt sync uses the Trakt API.
+
+---
+
+## License
+
+ScreenGrave is free and open source under the **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0).
+
+In short: you can use it, change it, and share it. If you share a modified version, or run one for other people over a network, you must make your changes available under the same license. Improvements stay open for everyone.
+
+Copyright © 2026 Worked-Locally

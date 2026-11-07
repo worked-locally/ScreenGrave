@@ -1,5 +1,6 @@
 import { useReleaseDate, useStatusOf } from '../lib/status'
 import { img, type Title } from '../lib/tmdb'
+import ShowStateLabel from './ShowStateLabel'
 import StatusBadge from './StatusBadge'
 
 const pretty = (d: string) =>
@@ -33,6 +34,7 @@ export default function Poster({ title }: { title: Title }) {
         </div>
       )}
 
+      <ShowStateLabel title={title} />
       <StatusBadge status={status} />
     </div>
   )

@@ -112,9 +112,13 @@ export interface Upcoming {
   name: string
 }
 
+// a show's life: still running, not out yet, finished, or stopped early
+export type ShowState = 'ongoing' | 'soon' | 'ended' | 'canceled'
+
 export interface Info {
   aired: number // episodes aired so far (shows only)
   ended: boolean // the show is finished or canceled (shows only)
+  state?: ShowState // shows only
   release: string // release date (movies) or premiere date (shows)
   next: Upcoming | null
   soon?: Upcoming[] // shows: every episode in the next 4 weeks, one entry per day
@@ -196,9 +200,14 @@ export async function fetchInfo(t: Title): Promise<Info> {
   const soonish = next && next.date <= new Date(Date.now() + SOON_DAYS * 86_400_000).toLocaleDateString('en-CA')
   const soon = soonish && nx ? await soonEpisodes(t.id, nx.season_number).catch(() => [next]) : undefined
 
+  const status = d.status as string | undefined
+  const state: ShowState =
+    status === 'Ended' ? 'ended' : status === 'Canceled' ? 'canceled' : aired === 0 ? 'soon' : 'ongoing'
+
   return {
     aired,
-    ended: d.status === 'Ended' || d.status === 'Canceled',
+    ended: state === 'ended' || state === 'canceled',
+    state,
     release: (d.first_air_date as string) || '',
     next,
     soon: soon?.length ? soon : undefined,
